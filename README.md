@@ -2,14 +2,6 @@
 
 A desktop app that helps users in Southeast Asia detect romance scams in real time.
 
-## Team Ownership
-
-| Member | Feature | Files |
-|--------|---------|-------|
-| Member 1 | Background Check | `backend/routers/background_check.py`, `backend/services/osint/`, `app/lib/features/background_check/` |
-| Member 2 | Chat Monitor + Video Monitor | `backend/routers/chat.py`, `backend/routers/video.py`, `backend/services/llm/`, `app/lib/features/chat_monitor/`, `app/lib/features/video_monitor/` |
-| Member 3 | Community Flagging | `backend/routers/community.py`, `backend/services/flagging/`, `app/lib/features/community/` |
-
 ## Setup
 
 ### 1. Clone and set up environment
