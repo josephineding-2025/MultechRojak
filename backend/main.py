@@ -27,6 +27,10 @@ app.include_router(background_check.router)
 app.include_router(community.router)
 
 
+@app.get("/")
+def root():
+    return {"message": "Welcome to the What is Fake Love API. Go to /docs for documentation."}
+
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "0.1.0"}
