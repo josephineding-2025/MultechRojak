@@ -226,6 +226,14 @@ def run_background_check(
         except (RuntimeError, ValueError):
             pass
 
+    # --- Photo hash (for community cross-check) ---
+    photo_hash: Optional[str] = None
+    if photo_b64 and photo_b64.strip():
+        try:
+            photo_hash = compute_phash(photo_b64)
+        except ValueError:
+            pass
+
     # --- Platform authenticity ---
     authenticity = check_platform_authenticity(username.strip(), platform)
 
@@ -289,4 +297,5 @@ def run_background_check(
         "platform_followers": authenticity["platform_followers"],
         "platform_account_age_days": authenticity["platform_account_age_days"],
         "authenticity_note": authenticity["authenticity_note"],
+        "photo_hash": photo_hash,
     }

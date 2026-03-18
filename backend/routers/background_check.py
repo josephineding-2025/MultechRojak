@@ -31,6 +31,7 @@ class BackgroundCheckResult(BaseModel):
     platform_followers: Optional[int] = None
     platform_account_age_days: Optional[int] = None
     authenticity_note: str
+    photo_hash: Optional[str] = None   # perceptual hash; null if no photo provided
 
 
 @router.post("/background-check", response_model=BackgroundCheckResult)
