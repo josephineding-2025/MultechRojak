@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'core/theme/app_theme.dart';
 import 'core/widgets/overlay_shell.dart';
 
 void main() async {
@@ -10,12 +11,12 @@ void main() async {
   await windowManager.ensureInitialized();
 
   const windowOptions = WindowOptions(
-    size: Size(320, 480),
-    minimumSize: Size(280, 400),
+    size: Size(390, 820),
+    minimumSize: Size(360, 600),
     center: false,
     alwaysOnTop: true,
     titleBarStyle: TitleBarStyle.hidden,
-    title: 'Fake Love Detector',
+    title: 'What is Fake Love',
   );
 
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -36,15 +37,9 @@ class FakeLoveApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fake Love Detector',
+      title: 'What is Fake Love',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE53935),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.theme,
       home: const OverlayShell(),
     );
   }
