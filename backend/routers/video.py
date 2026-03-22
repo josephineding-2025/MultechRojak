@@ -1,26 +1,28 @@
-"""
-Video Monitor router — Owner: Member 2
+"""Video Monitor router.
 Analyzes video call frames and audio chunks for suspicious patterns.
 """
-from fastapi import APIRouter
+
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from services.llm import analyze_audio_chunk, analyze_video_frame
 
 router = APIRouter(tags=["Video Monitor"])
 
 
 class VideoFrameRequest(BaseModel):
-    frame: str       # base64-encoded image
+    frame: str  # base64-encoded image
     session_id: str
 
 
 class VideoAlert(BaseModel):
     alert: bool
     reason: str
-    severity: str    # "critical" | "high" | "medium" | "low"
+    severity: str  # "critical" | "high" | "medium" | "low"
 
 
 class AudioChunkRequest(BaseModel):
-    audio_b64: str   # base64-encoded audio
+    audio_b64: str  # base64-encoded audio
     session_id: str
 
 
@@ -28,37 +30,36 @@ class AudioAlert(BaseModel):
     transcription: str
     alert: bool
     reason: str
-    severity: str    # "critical" | "high" | "medium" | "low"
+    severity: str  # "critical" | "high" | "medium" | "low"
 
 
 @router.post("/analyze-video-frame", response_model=VideoAlert)
-async def analyze_video_frame(req: VideoFrameRequest) -> VideoAlert:
-    """
-    Analyze a single video call frame for visual anomalies.
+async def analyze_video_frame_endpoint(req: VideoFrameRequest) -> VideoAlert:
+    """Analyze a single video call frame for visual anomalies."""
+    if not req.frame:
+        raise HTTPException(status_code=400, detail="frame is required")
 
-    TODO (Member 2): Replace mock with real vision LLM analysis.
-    See backend/services/llm/ for the implementation stub.
-    """
-    # --- MOCK RESPONSE — matches SPEC.md Section 8 exactly ---
-    return VideoAlert(
-        alert=True,
-        reason="Face inconsistency detected across frames",
-        severity="high",
-    )
+    try:
+        result = analyze_video_frame(frame=req.frame, session_id=req.session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail="Failed to analyze video frame") from exc
+
+    return VideoAlert(**result.model_dump())
 
 
 @router.post("/analyze-audio-chunk", response_model=AudioAlert)
-async def analyze_audio_chunk(req: AudioChunkRequest) -> AudioAlert:
-    """
-    Transcribe and analyze an audio chunk from a live call.
+async def analyze_audio_chunk_endpoint(req: AudioChunkRequest) -> AudioAlert:
+    """Transcribe and analyze an audio chunk from a live call."""
+    if not req.audio_b64:
+        raise HTTPException(status_code=400, detail="audio_b64 is required")
 
-    TODO (Member 2): Replace mock with Whisper transcription + LLM analysis.
-    See backend/services/llm/ for the implementation stub.
-    """
-    # --- MOCK RESPONSE — matches SPEC.md Section 8 exactly ---
-    return AudioAlert(
-        transcription="Can you please send me $500 tonight...",
-        alert=True,
-        reason="Urgent money request detected in speech",
-        severity="critical",
-    )
+    try:
+        result = analyze_audio_chunk(audio_b64=req.audio_b64, session_id=req.session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail="Failed to analyze audio chunk") from exc
+
+    return AudioAlert(**result.model_dump())
