@@ -1,9 +1,11 @@
 // Owner: Member 1
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/models/background_check_result.dart';
 import '../../core/models/community_flag.dart';
+import '../../core/theme/app_theme.dart';
 import '../community/community_provider.dart';
 import 'background_check_provider.dart';
 
@@ -11,17 +13,27 @@ class BackgroundCheckScreen extends ConsumerStatefulWidget {
   const BackgroundCheckScreen({super.key});
 
   @override
-  ConsumerState<BackgroundCheckScreen> createState() => _BackgroundCheckScreenState();
+  ConsumerState<BackgroundCheckScreen> createState() =>
+      _BackgroundCheckScreenState();
 }
 
-class _BackgroundCheckScreenState extends ConsumerState<BackgroundCheckScreen> {
+class _BackgroundCheckScreenState
+    extends ConsumerState<BackgroundCheckScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
   String _selectedPlatform = 'X';
   Map<String, String>? _params;
 
-  static const _platforms = ['X', 'GitHub', 'Instagram', 'Telegram', 'WhatsApp', 'Dating App', 'Other'];
+  static const _platforms = [
+    'X',
+    'GitHub',
+    'Instagram',
+    'Telegram',
+    'WhatsApp',
+    'Dating App',
+    'Other'
+  ];
 
   @override
   void dispose() {
@@ -42,7 +54,8 @@ class _BackgroundCheckScreenState extends ConsumerState<BackgroundCheckScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final result = _params != null ? ref.watch(backgroundCheckProvider(_params!)) : null;
+    final result =
+        _params != null ? ref.watch(backgroundCheckProvider(_params!)) : null;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: result == null
@@ -55,36 +68,48 @@ class _BackgroundCheckScreenState extends ConsumerState<BackgroundCheckScreen> {
     );
   }
 
+  // ── Form ──────────────────────────────────────────────────────────────────
+
   Widget _buildForm() {
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Background Check',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.manage_search,
+                  size: 18, color: AppTheme.primaryContainer),
+              const SizedBox(width: 8),
+              Text('OSINT Search', style: AppTheme.headline(15)),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
+          Text(
+            'Verify a profile against public intelligence sources.',
+            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 16),
           TextFormField(
             controller: _usernameController,
+            style: AppTheme.body(13),
             decoration: const InputDecoration(
-              labelText: 'Username',
+              labelText: 'Username / Handle',
               hintText: 'e.g. john_doe123',
-              isDense: true,
+              prefixIcon: Icon(Icons.person_outline, size: 18),
             ),
-            style: const TextStyle(fontSize: 12),
             validator: (v) =>
                 (v == null || v.trim().isEmpty) ? 'Username is required' : null,
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
             value: _selectedPlatform,
+            style: AppTheme.body(13),
             decoration: const InputDecoration(
               labelText: 'Platform',
-              isDense: true,
+              prefixIcon: Icon(Icons.devices_outlined, size: 18),
             ),
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
             items: _platforms
                 .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                 .toList(),
@@ -93,58 +118,82 @@ class _BackgroundCheckScreenState extends ConsumerState<BackgroundCheckScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _phoneController,
+            style: AppTheme.body(13),
             decoration: const InputDecoration(
               labelText: 'Phone (optional)',
               hintText: 'e.g. +60123456789',
-              isDense: true,
+              prefixIcon: Icon(Icons.phone_outlined, size: 18),
             ),
-            style: const TextStyle(fontSize: 12),
             keyboardType: TextInputType.phone,
           ),
-          const SizedBox(height: 16),
-          FilledButton(
+          const SizedBox(height: 20),
+          _GradientButton(
+            label: 'Run Background Check',
+            icon: Icons.search,
             onPressed: _onSubmit,
-            child: const Text('Run Background Check', style: TextStyle(fontSize: 12)),
           ),
         ],
       ),
     );
   }
 
+  // ── Loading ───────────────────────────────────────────────────────────────
+
   Widget _buildLoading() {
     return const Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(height: 40),
-        CircularProgressIndicator(),
-        SizedBox(height: 12),
-        Text('Checking...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        SizedBox(height: 48),
+        CircularProgressIndicator(
+          color: AppTheme.primaryContainer,
+          strokeWidth: 2.5,
+        ),
+        SizedBox(height: 14),
+        Text('Running intelligence checks...',
+            style: TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
       ],
     );
   }
+
+  // ── Error ─────────────────────────────────────────────────────────────────
 
   Widget _buildError(Object error, StackTrace? _) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         const SizedBox(height: 32),
-        const Icon(Icons.error_outline, color: Colors.red, size: 36),
-        const SizedBox(height: 8),
-        const Text('Check failed', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(
-          error.toString(),
-          style: const TextStyle(fontSize: 11, color: Colors.grey),
-          textAlign: TextAlign.center,
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.errorContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              const Icon(Icons.error_outline,
+                  color: AppTheme.error, size: 32),
+              const SizedBox(height: 8),
+              Text('Check failed',
+                  style: AppTheme.headline(13, color: AppTheme.error)),
+              const SizedBox(height: 4),
+              Text(
+                error.toString(),
+                style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         OutlinedButton(
           onPressed: () => setState(() => _params = null),
-          child: const Text('Retry', style: TextStyle(fontSize: 12)),
+          child: const Text('Try Again'),
         ),
       ],
     );
   }
+
+  // ── Results ───────────────────────────────────────────────────────────────
 
   Widget _buildResult(BackgroundCheckResult data) {
     final communityAsync = data.photoHash != null
@@ -154,132 +203,321 @@ class _BackgroundCheckScreenState extends ConsumerState<BackgroundCheckScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ScoreCard(score: data.profileConsistencyScore),
-        const SizedBox(height: 8),
-        _SectionCard(
-          title: 'Photo',
+        _RiskDialCard(score: data.profileConsistencyScore),
+        const SizedBox(height: 10),
+        _ResultSection(
+          title: 'Photo Verification',
           icon: Icons.image_search,
           child: data.photoFoundOnline
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Chip(
-                      label: Text('Found online', style: TextStyle(fontSize: 10)),
-                      backgroundColor: Color(0xFFFFEBEE),
-                    ),
-                    const SizedBox(height: 4),
+                    _StatusChip(
+                        label: 'Found online',
+                        color: AppTheme.error,
+                        bg: AppTheme.errorContainer),
+                    const SizedBox(height: 6),
                     ...data.photoSources.map(
-                      (url) => Text(
-                        url,
-                        style: const TextStyle(fontSize: 10, color: Colors.blue),
-                        overflow: TextOverflow.ellipsis,
+                      (url) => Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.open_in_new,
+                                size: 11,
+                                color: AppTheme.primaryContainer),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(url,
+                                  style: AppTheme.body(10,
+                                      color: AppTheme.primaryContainer),
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 )
-              : const _GreenBadge('No online matches'),
+              : const _GreenCheck('No online matches found'),
         ),
         if (_params?.containsKey('phone') == true) ...[
           const SizedBox(height: 8),
-          _SectionCard(
-            title: 'Phone',
-            icon: Icons.phone,
+          _ResultSection(
+            title: 'Phone Validation',
+            icon: Icons.phone_outlined,
             child: Wrap(
               spacing: 6,
               runSpacing: 4,
               children: [
-                Chip(
-                  label: Text(
-                    data.phoneValid ? 'Valid' : 'Invalid',
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                  backgroundColor:
-                      data.phoneValid ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                _StatusChip(
+                  label: data.phoneValid ? 'Valid' : 'Invalid',
+                  color: data.phoneValid
+                      ? const Color(0xFF2E7D32)
+                      : AppTheme.error,
+                  bg: data.phoneValid
+                      ? const Color(0xFFE8F5E9)
+                      : AppTheme.errorContainer,
                 ),
                 if (data.phoneCountry.isNotEmpty)
-                  Text(data.phoneCountry, style: const TextStyle(fontSize: 11)),
+                  _InfoChip(label: data.phoneCountry),
                 if (data.phoneCarrier != null)
-                  Text('via ${data.phoneCarrier}',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  _InfoChip(label: 'via ${data.phoneCarrier}'),
               ],
             ),
           ),
         ],
         const SizedBox(height: 8),
-        _SectionCard(
-          title: 'Platforms',
-          icon: Icons.devices,
+        _ResultSection(
+          title: 'Platform Presence',
+          icon: Icons.devices_outlined,
           child: data.usernamePlatforms.isEmpty
-              ? const Text(
-                  'Not found on any checked platform',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                )
+              ? Text('Not found on any checked platform',
+                  style:
+                      AppTheme.body(11, color: AppTheme.onSurfaceVariant))
               : Wrap(
                   spacing: 4,
                   runSpacing: 4,
                   children: data.usernamePlatforms
-                      .map((p) => Chip(
-                            label: Text(p, style: const TextStyle(fontSize: 10)),
-                            padding: EdgeInsets.zero,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ))
+                      .map((p) => _InfoChip(label: p))
                       .toList(),
                 ),
         ),
         const SizedBox(height: 8),
-        _SectionCard(
+        _ResultSection(
           title: 'Account Authenticity',
-          icon: Icons.verified_user,
+          icon: Icons.verified_user_outlined,
           child: _AuthenticitySection(data: data),
         ),
         if (communityAsync != null) ...[
           const SizedBox(height: 8),
-          _SectionCard(
+          _ResultSection(
             title: 'Community Reports',
-            icon: Icons.people,
+            icon: Icons.people_outline,
             child: communityAsync.when(
               data: (r) => _CommunityReportSection(result: r),
               loading: () => const SizedBox(
-                height: 24,
-                child: Center(child: LinearProgressIndicator()),
+                height: 20,
+                child: Center(
+                    child: LinearProgressIndicator(
+                        color: AppTheme.primaryContainer)),
               ),
-              error: (_, __) => const Text(
-                'Community check unavailable.',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
+              error: (_, __) => Text('Community check unavailable.',
+                  style:
+                      AppTheme.body(11, color: AppTheme.onSurfaceVariant)),
             ),
           ),
         ],
         const SizedBox(height: 8),
-        _SectionCard(
+        _ResultSection(
           title: 'Summary',
-          icon: Icons.summarize,
+          icon: Icons.summarize_outlined,
           child: Text(
             data.backgroundSummary,
-            style: const TextStyle(
-              fontSize: 11,
-              fontStyle: FontStyle.italic,
-              color: Colors.grey,
-            ),
+            style: AppTheme.body(11,
+                color: AppTheme.onSurfaceVariant,
+                weight: FontWeight.normal),
           ),
         ),
         const SizedBox(height: 16),
         OutlinedButton(
           onPressed: () => setState(() => _params = null),
-          child: const Text('Run Another Check', style: TextStyle(fontSize: 12)),
+          child: const Text('New Search'),
         ),
+        const SizedBox(height: 8),
       ],
     );
   }
 }
 
+// ── Shared Widgets ────────────────────────────────────────────────────────────
+
+class _GradientButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  const _GradientButton(
+      {required this.label, required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        height: 46,
+        decoration: AppTheme.gradientBox(radius: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Text(label,
+                style: GoogleFonts.manrope(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RiskDialCard extends StatelessWidget {
+  final int score;
+  const _RiskDialCard({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppTheme.riskColor(score);
+    final bg = AppTheme.riskBackground(score);
+    final label = AppTheme.riskLabel(score);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: AppTheme.surfaceCard(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$score',
+                style: GoogleFonts.manrope(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    height: 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4, left: 2),
+                child: Text('/100',
+                    style: AppTheme.body(12,
+                        color: AppTheme.onSurfaceVariant)),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(label,
+                    style: AppTheme.label(10, color: color)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: score / 100,
+              backgroundColor: AppTheme.surfaceContainer,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text('CONSISTENCY SCORE',
+              style: AppTheme.label(9,
+                  color: AppTheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultSection extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Widget child;
+  const _ResultSection(
+      {required this.title, required this.icon, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.tonalSection(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, size: 13, color: AppTheme.primaryContainer),
+            const SizedBox(width: 6),
+            Text(title, style: AppTheme.headline(11)),
+          ]),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color bg;
+  const _StatusChip(
+      {required this.label, required this.color, required this.bg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(label, style: AppTheme.label(10, color: color)),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final String label;
+  const _InfoChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+          color: AppTheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(20)),
+      child: Text(label, style: AppTheme.label(10)),
+    );
+  }
+}
+
+class _GreenCheck extends StatelessWidget {
+  final String label;
+  const _GreenCheck(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.check_circle_outline,
+            size: 13, color: Color(0xFF2E7D32)),
+        const SizedBox(width: 4),
+        Text(label,
+            style: AppTheme.body(11, color: const Color(0xFF2E7D32))),
+      ],
+    );
+  }
+}
+
+// ── Authenticity Section ──────────────────────────────────────────────────────
+
 class _AuthenticitySection extends StatelessWidget {
   final BackgroundCheckResult data;
   const _AuthenticitySection({required this.data});
 
-  String _formatFollowers(int n) {
-    if (n >= 1_000_000) return '${(n / 1_000_000).toStringAsFixed(1)}M';
-    if (n >= 1_000) return '${(n / 1_000).toStringAsFixed(1)}K';
+  String _fmt(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
     return '$n';
   }
 
@@ -287,12 +525,16 @@ class _AuthenticitySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final note = data.authenticityNote;
     final Color bannerColor;
+    final Color textColor;
     if (note.startsWith('High confidence')) {
       bannerColor = const Color(0xFFE8F5E9);
+      textColor = const Color(0xFF2E7D32);
     } else if (note.startsWith('Warning')) {
-      bannerColor = const Color(0xFFFFEBEE);
+      bannerColor = AppTheme.errorContainer;
+      textColor = AppTheme.error;
     } else {
       bannerColor = const Color(0xFFFFF8E1);
+      textColor = const Color(0xFFF57F17);
     }
 
     return Column(
@@ -302,166 +544,47 @@ class _AuthenticitySection extends StatelessWidget {
           spacing: 6,
           runSpacing: 4,
           children: [
-            Chip(
-              label: Text(
-                data.platformVerified ? 'Verified' : 'Not Verified',
-                style: const TextStyle(fontSize: 10),
-              ),
-              backgroundColor: data.platformVerified
+            _StatusChip(
+              label: data.platformVerified ? 'Verified' : 'Not Verified',
+              color: data.platformVerified
+                  ? const Color(0xFF2E7D32)
+                  : const Color(0xFFF57F17),
+              bg: data.platformVerified
                   ? const Color(0xFFE8F5E9)
                   : const Color(0xFFFFF8E1),
             ),
             if (data.platformFollowers != null)
-              Chip(
-                label: Text(
-                  '${_formatFollowers(data.platformFollowers!)} followers',
-                  style: const TextStyle(fontSize: 10),
-                ),
-                backgroundColor: const Color(0xFFF3E5F5),
-              ),
+              _InfoChip(label: '${_fmt(data.platformFollowers!)} followers'),
             if (data.platformAccountAgeDays != null)
-              Chip(
-                label: Text(
-                  '${data.platformAccountAgeDays!} days old',
-                  style: const TextStyle(fontSize: 10),
-                ),
-                backgroundColor: data.platformAccountAgeDays! < 90
-                    ? const Color(0xFFFFEBEE)
+              _StatusChip(
+                label: '${data.platformAccountAgeDays!}d old',
+                color: data.platformAccountAgeDays! < 90
+                    ? AppTheme.error
+                    : AppTheme.primaryContainer,
+                bg: data.platformAccountAgeDays! < 90
+                    ? AppTheme.errorContainer
                     : const Color(0xFFE3F2FD),
               ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: bannerColor,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(note, style: const TextStyle(fontSize: 11)),
+          child:
+              Text(note, style: AppTheme.body(11, color: textColor)),
         ),
       ],
     );
   }
 }
 
-class _ScoreCard extends StatelessWidget {
-  final int score;
-  const _ScoreCard({required this.score});
-
-  @override
-  Widget build(BuildContext context) {
-    final Color barColor;
-    final String label;
-    if (score >= 70) {
-      barColor = Colors.green;
-      label = 'Low Risk';
-    } else if (score >= 40) {
-      barColor = Colors.orange;
-      label = 'Medium Risk';
-    } else {
-      barColor = Colors.red;
-      label = 'High Risk';
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  '$score',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: barColor,
-                  ),
-                ),
-                const Text('/100', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: barColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(label, style: TextStyle(fontSize: 10, color: barColor)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            LinearProgressIndicator(
-              value: score / 100,
-              backgroundColor: Colors.grey.shade200,
-              valueColor: AlwaysStoppedAnimation<Color>(barColor),
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Consistency Score (higher = more trustworthy)',
-              style: TextStyle(fontSize: 10, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Widget child;
-  const _SectionCard({required this.title, required this.icon, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 13, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GreenBadge extends StatelessWidget {
-  final String label;
-  const _GreenBadge(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.check_circle, size: 13, color: Colors.green),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.green)),
-      ],
-    );
-  }
-}
+// ── Community Report Section ──────────────────────────────────────────────────
 
 class _CommunityReportSection extends StatelessWidget {
   final ProfileCheckResult result;
@@ -470,13 +593,19 @@ class _CommunityReportSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!result.flagged) {
-      return const _GreenBadge('No community reports for this photo');
+      return const _GreenCheck('No community reports for this photo');
     }
     final statusColor = result.status == 'confirmed'
-        ? Colors.red
+        ? AppTheme.error
         : result.status == 'flagged'
-            ? Colors.orange
-            : Colors.amber;
+            ? const Color(0xFFF57F17)
+            : const Color(0xFFF9A825);
+    final statusBg = result.status == 'confirmed'
+        ? AppTheme.errorContainer
+        : result.status == 'flagged'
+            ? const Color(0xFFFFF3E0)
+            : const Color(0xFFFFFDE7);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -484,37 +613,36 @@ class _CommunityReportSection extends StatelessWidget {
           spacing: 6,
           runSpacing: 4,
           children: [
-            Chip(
-              label: Text(
-                '${result.reportCount ?? 0} report${(result.reportCount ?? 0) == 1 ? "" : "s"}',
-                style: const TextStyle(fontSize: 10),
-              ),
-              backgroundColor: statusColor.withOpacity(0.15),
+            _StatusChip(
+              label:
+                  '${result.reportCount ?? 0} report${(result.reportCount ?? 0) == 1 ? "" : "s"}',
+              color: statusColor,
+              bg: statusBg,
             ),
             if (result.status != null)
-              Chip(
-                label: Text(result.status!.toUpperCase(), style: const TextStyle(fontSize: 10)),
-                backgroundColor: statusColor.withOpacity(0.15),
-              ),
-            if (result.region != null)
-              Text(result.region!, style: const TextStyle(fontSize: 11)),
+              _StatusChip(
+                  label: result.status!.toUpperCase(),
+                  color: statusColor,
+                  bg: statusBg),
+            if (result.region != null) _InfoChip(label: result.region!),
           ],
         ),
-        if (result.firstReported != null)
-          Text('First reported: ${result.firstReported}',
-              style: const TextStyle(fontSize: 10, color: Colors.grey)),
-        if (result.commonFlags != null && result.commonFlags!.isNotEmpty) ...[
+        if (result.firstReported != null) ...[
           const SizedBox(height: 4),
+          Text('First reported: ${result.firstReported}',
+              style: AppTheme.label(10)),
+        ],
+        if (result.commonFlags != null &&
+            result.commonFlags!.isNotEmpty) ...[
+          const SizedBox(height: 6),
           Wrap(
             spacing: 4,
             runSpacing: 4,
             children: result.commonFlags!
-                .map((f) => Chip(
-                      label: Text(f, style: const TextStyle(fontSize: 10)),
-                      backgroundColor: const Color(0xFFFFEBEE),
-                      padding: EdgeInsets.zero,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ))
+                .map((f) => _StatusChip(
+                    label: f,
+                    color: AppTheme.error,
+                    bg: AppTheme.errorContainer))
                 .toList(),
           ),
         ],
