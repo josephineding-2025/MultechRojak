@@ -6,13 +6,18 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fake_love_detector/main.dart';
 
 void main() {
   testWidgets('App smoke test renders main shell', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const FakeLoveApp());
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: FakeLoveApp(),
+      ),
+    );
 
     // `OverlayShell` runs a backend health check in `initState`. Let any
     // pending timers complete so the test framework doesn't fail on teardown.

@@ -9,6 +9,7 @@ import '../../core/api/api_error.dart';
 import '../../core/models/app_state.dart';
 import '../../core/models/requests.dart';
 import '../../core/models/risk_report.dart';
+import '../../core/state/shell_navigation.dart';
 import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../background_check/background_check_utils.dart';
@@ -126,6 +127,7 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
             sourceType: 'chat',
             sourceRiskLevel: result.riskLevel,
             sourceSessionId: _sessionId,
+            platform: _selectedPlatform,
           ),
         );
       } else {
@@ -314,6 +316,7 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   Widget _buildReport(RiskReport report) {
     final color = _riskColor(report.riskLevel);
     final bg = _riskBg(report.riskLevel);
+    final canFlagProfile = isRiskLevelEligibleForCommunity(report.riskLevel);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -398,6 +401,21 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
                     color: AppTheme.onSurfaceVariant)),
           ),
         ],
+        const SizedBox(height: 12),
+        _GradientButton(
+          label: 'Flag This Profile',
+          icon: Icons.flag_outlined,
+          onPressed: canFlagProfile ? _openCommunityFlagFlow : () {},
+          enabled: canFlagProfile,
+        ),
+        if (!canFlagProfile) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Community flagging unlocks after a completed scan result.',
+            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 16),
         OutlinedButton(
           onPressed: _reset,
@@ -437,6 +455,27 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
       ],
     );
   }
+
+  Future<void> _openCommunityFlagFlow() async {
+    final eligibility =
+        await LocalAppStateStore.instance.loadCommunityFlagEligibility();
+    final lastLookup =
+        await LocalAppStateStore.instance.loadLastCommunityLookup();
+    if (!mounted || eligibility == null) {
+      return;
+    }
+
+    ref.read(communityLaunchIntentProvider.notifier).state =
+        CommunityLaunchIntent(
+      launchId: DateTime.now().microsecondsSinceEpoch,
+      mode: CommunityLaunchMode.flag,
+      platform: eligibility.platform ?? _selectedPlatform,
+      handle: eligibility.handle ?? lastLookup?.handle,
+      phone: eligibility.phone ?? lastLookup?.phone,
+      photoHash: eligibility.photoHash,
+    );
+    ref.read(shellTabProvider.notifier).state = ShellTab.circle;
+  }
 }
 
 // ── Risk helpers ──────────────────────────────────────────────────────────────
@@ -471,26 +510,40 @@ class _GradientButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
+  final bool enabled;
   const _GradientButton(
-      {required this.label, required this.icon, required this.onPressed});
+      {required this.label,
+      required this.icon,
+      required this.onPressed,
+      this.enabled = true});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onPressed,
+      onTap: enabled ? onPressed : null,
       child: Container(
         height: 46,
-        decoration: AppTheme.gradientBox(radius: 12),
+        decoration: enabled
+            ? AppTheme.gradientBox(radius: 12)
+            : BoxDecoration(
+                color: AppTheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 16),
+            Icon(
+              icon,
+              color: enabled ? Colors.white : AppTheme.onSurfaceVariant,
+              size: 16,
+            ),
             const SizedBox(width: 8),
             Text(label,
                 style: GoogleFonts.manrope(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white)),
+                    color:
+                        enabled ? Colors.white : AppTheme.onSurfaceVariant)),
           ],
         ),
       ),

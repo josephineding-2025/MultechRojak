@@ -2,15 +2,28 @@
 Community Flagging router — Owner: Member 3
 Allows users to report scammers and warn others via a shared community database.
 """
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
+import httpx
 from pydantic import BaseModel
 
 from services.flagging import check_profile as check_profile_service
 from services.flagging import submit_scammer_report
 
 router = APIRouter(tags=["Community Flagging"])
+logger = logging.getLogger(__name__)
+
+
+def _detail_for_community_error(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPError):
+        return "Supabase is unreachable. Check SUPABASE_URL, network access, and project availability."
+
+    message = str(exc).strip()
+    if message:
+        return message
+    return "Community database request failed."
 
 
 class FlagScammerRequest(BaseModel):
@@ -45,10 +58,10 @@ async def flag_scammer(req: FlagScammerRequest) -> FlagScammerResult:
     """
     Submit a community flag for a scammer profile.
     """
-    if req.source_risk_level.upper() not in {"MEDIUM", "HIGH", "CRITICAL"}:
+    if req.source_risk_level.upper() not in {"LOW", "MEDIUM", "HIGH", "CRITICAL"}:
         raise HTTPException(
             status_code=400,
-            detail="Community reporting is only allowed after a Medium, High, or Critical scan.",
+            detail="Community reporting is only allowed after a completed scan.",
         )
     if not req.source_session_id.strip():
         raise HTTPException(
@@ -68,7 +81,11 @@ async def flag_scammer(req: FlagScammerRequest) -> FlagScammerResult:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail="Failed to submit scammer report") from exc
+        logger.exception("Community flag submission failed")
+        raise HTTPException(
+            status_code=500,
+            detail=_detail_for_community_error(exc),
+        ) from exc
 
     return FlagScammerResult(**result)
 
@@ -94,6 +111,10 @@ async def check_profile(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail="Failed to check profile") from exc
+        logger.exception("Community profile check failed")
+        raise HTTPException(
+            status_code=500,
+            detail=_detail_for_community_error(exc),
+        ) from exc
 
     return ProfileCheckResult(**result)

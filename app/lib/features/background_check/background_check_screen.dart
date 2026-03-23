@@ -534,6 +534,7 @@ class _BackgroundCheckScreenState
           sourceType: 'background_check',
           sourceRiskLevel: riskLevel,
           sourceSessionId: sessionId,
+          platform: data.scrapedProfile?.platform ?? _selectedPlatform,
           handle: handle,
           phone: phone,
           photoHash: data.photoHash,

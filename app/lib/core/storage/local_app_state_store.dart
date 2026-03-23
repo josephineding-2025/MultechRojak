@@ -12,6 +12,7 @@ class LocalAppStateStore {
 
   static const _latestChatReportKey = 'latest_chat_report';
   static const _communityEligibilityKey = 'community_flag_eligibility';
+  static const _lastCommunityLookupKey = 'last_community_lookup';
   static const _settingsKey = 'app_settings';
 
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
@@ -59,6 +60,25 @@ class LocalAppStateStore {
   Future<void> clearCommunityFlagEligibility() async {
     final prefs = await _prefs;
     await prefs.remove(_communityEligibilityKey);
+  }
+
+  Future<void> saveLastCommunityLookup(LastCommunityLookup lookup) async {
+    final prefs = await _prefs;
+    await prefs.setString(_lastCommunityLookupKey, lookup.encode());
+  }
+
+  Future<LastCommunityLookup?> loadLastCommunityLookup() async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_lastCommunityLookupKey);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+
+    try {
+      return LastCommunityLookup.decode(raw);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<AppSettings> loadSettings() async {

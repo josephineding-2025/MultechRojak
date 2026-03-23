@@ -7,6 +7,7 @@ import '../../features/chat_monitor/chat_monitor_screen.dart';
 import '../../features/community/community_screen.dart';
 import '../../features/video_monitor/video_monitor_screen.dart';
 import '../api/api_client.dart';
+import '../state/shell_navigation.dart';
 import '../theme/app_theme.dart';
 
 class OverlayShell extends ConsumerStatefulWidget {
@@ -17,7 +18,6 @@ class OverlayShell extends ConsumerStatefulWidget {
 }
 
 class _OverlayShellState extends ConsumerState<OverlayShell> {
-  int _selectedIndex = 0;
   bool _backendReachable = false;
   bool _checkingBackend = true;
 
@@ -46,6 +46,9 @@ class _OverlayShellState extends ConsumerState<OverlayShell> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedTab = ref.watch(shellTabProvider);
+    final selectedIndex = ShellTab.values.indexOf(selectedTab);
+
     return Scaffold(
       backgroundColor: AppTheme.surface,
       body: Column(
@@ -53,12 +56,13 @@ class _OverlayShellState extends ConsumerState<OverlayShell> {
           _AppHeader(),
           if (!_checkingBackend && !_backendReachable)
             _BackendBanner(onRetry: _checkBackend),
-          Expanded(child: _screens[_selectedIndex]),
+          Expanded(child: _screens[selectedIndex]),
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (i) =>
+            ref.read(shellTabProvider.notifier).state = ShellTab.values[i],
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.forum_outlined),
