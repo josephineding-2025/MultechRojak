@@ -2,24 +2,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/community_flag.dart';
+import '../../core/models/requests.dart';
 import 'community_service.dart';
 
-/// Check if a profile is in the community database.
-final profileCheckProvider = FutureProvider.family<ProfileCheckResult, Map<String, String>>(
-  (ref, params) async {
+final profileCheckProvider =
+    FutureProvider.family<ProfileCheckResult, CommunityProfileLookupDto>(
+  (ref, lookup) async {
     final service = CommunityService();
-    return service.checkProfile(
-      handle: params['handle'],
-      phone: params['phone'],
-      photoHash: params['photo_hash'],
-    );
+    return service.checkProfile(lookup);
   },
 );
 
-/// Flag a scammer profile.
-final flagScammerProvider = FutureProvider.family<FlagScammerResult, Map<String, dynamic>>(
-  (ref, params) async {
+final flagScammerProvider =
+    FutureProvider.family<FlagScammerResult, CommunityFlagRequestDto>(
+  (ref, request) async {
     final service = CommunityService();
-    return service.flagScammer(params);
+    return service.flagScammer(request);
   },
 );

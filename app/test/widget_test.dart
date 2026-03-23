@@ -5,7 +5,6 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:fake_love_detector/main.dart';
@@ -20,10 +19,10 @@ void main() {
     await tester.pump(const Duration(seconds: 6));
 
     // Verify that key UI elements render (independent of backend availability).
-    expect(find.text('Fake Love Detector'), findsOneWidget);
-    expect(find.text('Chat'), findsOneWidget);
-    expect(find.text('Video'), findsOneWidget);
-    expect(find.text('Check'), findsOneWidget);
-    expect(find.text('Report'), findsOneWidget);
+    expect(find.text('What is Fake Love'), findsOneWidget);
+    expect(find.text('Monitor'), findsOneWidget);
+    expect(find.text('Visuals'), findsOneWidget);
+    expect(find.text('OSINT'), findsOneWidget);
+    expect(find.text('Circle'), findsOneWidget);
   });
 }

@@ -139,6 +139,53 @@ async def _scrape_twitter(page, username: str) -> dict:
     return result
 
 
+async def _scrape_github(page, username: str) -> dict:
+    """Scrape a public GitHub profile page."""
+    result: dict = {}
+    try:
+        await page.goto(
+            f"https://github.com/{username}",
+            wait_until="domcontentloaded",
+            timeout=30000,
+        )
+        await page.wait_for_selector("meta[property='og:title']", timeout=12000)
+
+        bio_text = await page.evaluate(
+            "() => document.querySelector('meta[property=\"og:description\"]')?.content || ''"
+        )
+        result["bio_text"] = bio_text
+
+        follower_count = await page.evaluate(
+            """() => {
+                const el = document.querySelector('a[href$="?tab=followers"] .text-bold');
+                return el ? el.textContent : null;
+            }""",
+        )
+        if follower_count:
+            result["follower_count"] = _parse_follower_count(follower_count)
+
+        following_count = await page.evaluate(
+            """() => {
+                const el = document.querySelector('a[href$="?tab=following"] .text-bold');
+                return el ? el.textContent : null;
+            }""",
+        )
+        if following_count:
+            result["following_count"] = _parse_follower_count(following_count)
+
+        photo_url = await page.evaluate(
+            "() => document.querySelector('meta[property=\"og:image\"]')?.content || ''"
+        )
+        if photo_url:
+            photo_b64 = await _fetch_image_as_b64(page, photo_url)
+            if photo_b64:
+                result["photo_b64"] = photo_b64
+    except Exception as exc:
+        result["scrape_error"] = str(exc)
+
+    return result
+
+
 def _parse_follower_count(text: str) -> int | None:
     """Parse '12.5K', '1.2M', '850' style follower counts."""
     try:
@@ -230,6 +277,8 @@ async def scrape_profile(profile_url: str) -> dict:
                 platform_data = await _scrape_instagram(page, username)
             elif platform in ("twitter", "x"):
                 platform_data = await _scrape_twitter(page, username)
+            elif platform == "github":
+                platform_data = await _scrape_github(page, username)
             else:
                 result["scrape_error"] = f"Unsupported platform: {platform}"
 

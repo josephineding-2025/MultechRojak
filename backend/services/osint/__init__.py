@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from base64 import b64decode
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from io import BytesIO
 from typing import Optional
@@ -133,6 +134,13 @@ def _build_authenticity_note(is_verified: bool, followers: int, age_days: int, p
     return "Account exists but lacks strong authenticity signals. Verify independently."
 
 
+def _safe_call(func, *args, default=None, swallow=(Exception,)):
+    try:
+        return func(*args)
+    except swallow:
+        return default
+
+
 def check_platform_authenticity(username: str, platform: str) -> dict:
     """Deep authenticity check on the claimed platform. Supports X and GitHub."""
     p = platform.strip().lower()
@@ -240,42 +248,72 @@ def run_background_check(
     if photo_b64 and photo_b64.strip():
         _decode_base64_payload(photo_b64)
 
-    # --- Username platforms ---
-    username_platforms = check_username_platforms(username.strip())
+    # --- Parallel OSINT fan-out ---
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        username_future = executor.submit(check_username_platforms, username.strip())
+        authenticity_future = executor.submit(
+            check_platform_authenticity,
+            username.strip(),
+            platform,
+        )
+        phone_future = (
+            executor.submit(validate_phone, effective_phone.strip())
+            if effective_phone and effective_phone.strip()
+            else None
+        )
+        reverse_image_future = (
+            executor.submit(reverse_image_search, effective_photo_b64)
+            if effective_photo_b64 and effective_photo_b64.strip()
+            else None
+        )
+        photo_hash_future = (
+            executor.submit(compute_phash, effective_photo_b64)
+            if effective_photo_b64 and effective_photo_b64.strip()
+            else None
+        )
 
-    # --- Phone validation ---
-    phone_valid = False
-    phone_country = ""
-    phone_carrier: Optional[str] = None
-    if effective_phone and effective_phone.strip():
-        try:
-            phone_result = validate_phone(effective_phone.strip())
-            phone_valid = phone_result["valid"]
-            phone_country = phone_result["country_name"]
-            phone_carrier = phone_result["carrier"]
-        except (RuntimeError, ValueError):
-            pass
+        username_platforms = _safe_call(username_future.result, default=[], swallow=(Exception,))
+        authenticity = _safe_call(
+            authenticity_future.result,
+            default={
+                "platform_verified": False,
+                "platform_followers": None,
+                "platform_account_age_days": None,
+                "authenticity_note": f"Manual verification recommended for {platform}.",
+            },
+            swallow=(Exception,),
+        )
 
-    # --- Photo / reverse image search ---
-    photo_found_online = False
-    photo_sources: list[str] = []
-    if effective_photo_b64 and effective_photo_b64.strip():
-        try:
-            photo_sources = reverse_image_search(effective_photo_b64)
-            photo_found_online = len(photo_sources) > 0
-        except (RuntimeError, ValueError):
-            pass
+        phone_valid = False
+        phone_country = ""
+        phone_carrier: Optional[str] = None
+        if phone_future is not None:
+            phone_result = _safe_call(
+                phone_future.result,
+                default=None,
+                swallow=(Exception,),
+            )
+            if phone_result:
+                phone_valid = phone_result["valid"]
+                phone_country = phone_result["country_name"]
+                phone_carrier = phone_result["carrier"]
 
-    # --- Photo hash (for community cross-check) ---
-    photo_hash: Optional[str] = None
-    if effective_photo_b64 and effective_photo_b64.strip():
-        try:
-            photo_hash = compute_phash(effective_photo_b64)
-        except ValueError:
-            pass
+        photo_sources = []
+        if reverse_image_future is not None:
+            photo_sources = _safe_call(
+                reverse_image_future.result,
+                default=[],
+                swallow=(Exception,),
+            ) or []
+        photo_found_online = len(photo_sources) > 0
 
-    # --- Platform authenticity ---
-    authenticity = check_platform_authenticity(username.strip(), platform)
+        photo_hash: Optional[str] = None
+        if photo_hash_future is not None:
+            photo_hash = _safe_call(
+                photo_hash_future.result,
+                default=None,
+                swallow=(Exception,),
+            )
 
     # --- Consistency score (proportional to checks that ran) ---
     WEIGHT_USERNAME = 40
@@ -324,8 +362,10 @@ def run_background_check(
         risk_level = "LOW"
     elif score >= 40:
         risk_level = "MEDIUM"
-    else:
+    elif score >= 20:
         risk_level = "HIGH"
+    else:
+        risk_level = "CRITICAL"
 
     # --- Findings list ---
     findings: list[dict] = []
@@ -395,8 +435,8 @@ def run_background_check(
         parts.append(f"Username found on: {', '.join(username_platforms)}.")
     else:
         parts.append("Username not found on checked platforms.")
-    if score < 50:
-        parts.append("HIGH RISK: Multiple suspicious indicators detected.")
+    if risk_level in {"HIGH", "CRITICAL"}:
+        parts.append(f"{risk_level} RISK: Multiple suspicious indicators detected.")
 
     return {
         "photo_found_online": photo_found_online,

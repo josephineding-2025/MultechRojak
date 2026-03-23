@@ -1,25 +1,27 @@
 // Owner: Member 2
+import 'package:dio/dio.dart';
+
 import '../../core/api/api_client.dart';
+import '../../core/models/requests.dart';
 import '../../core/models/risk_report.dart';
 
 class ChatMonitorService {
   final _client = ApiClient.instance;
+  static const _analysisTimeout = Duration(minutes: 2);
 
   /// Analyze captured chat frames.
-  /// TODO (Member 2): Add screen capture logic — collect frames via screen_capturer,
-  /// deduplicate, convert to base64, then pass to this method.
-  Future<RiskReport> analyzeChat({
-    required String platform,
-    required String sessionId,
-    List<String> frames = const [],
-  }) async {
+  Future<RiskReport> analyzeChat(ChatAnalysisRequestDto request) async {
     final response = await _client.dio.post(
       '/analyze-chat',
       data: {
-        'frames': frames,
-        'platform': platform,
-        'session_id': sessionId,
+        'frames': request.frames,
+        'platform': request.platform,
+        'session_id': request.sessionId,
       },
+      options: Options(
+        receiveTimeout: _analysisTimeout,
+        sendTimeout: _analysisTimeout,
+      ),
     );
     return RiskReport.fromJson(response.data as Map<String, dynamic>);
   }

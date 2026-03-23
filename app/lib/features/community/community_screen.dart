@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/models/app_state.dart';
 import '../../core/models/community_flag.dart';
+import '../../core/models/requests.dart';
+import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
 import 'community_provider.dart';
 
@@ -17,7 +20,7 @@ class CommunityScreen extends ConsumerStatefulWidget {
 class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   // ── Check Profile ──────────────────────────────────────────────────────────
   final _checkController = TextEditingController();
-  Map<String, String>? _checkParams;
+  CommunityProfileLookupDto? _checkParams;
 
   // ── Flag Scammer ──────────────────────────────────────────────────────────
   final _flagHandleController = TextEditingController();
@@ -25,7 +28,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   String _flagPlatform = 'Telegram';
   String _flagRegion = 'MY';
   final Set<String> _selectedFlags = {};
-  Map<String, dynamic>? _flagParams;
+  CommunityFlagRequestDto? _flagParams;
+  AppSettings _settings = const AppSettings();
+  CommunityFlagEligibility? _eligibility;
+  bool _loadingState = true;
 
   static const _platforms = [
     'Telegram', 'WhatsApp', 'Instagram', 'X', 'Dating App', 'Other'
@@ -40,6 +46,12 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadLocalState();
+  }
+
+  @override
   void dispose() {
     _checkController.dispose();
     _flagHandleController.dispose();
@@ -47,28 +59,81 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     super.dispose();
   }
 
+  Future<void> _loadLocalState() async {
+    final settings = await LocalAppStateStore.instance.loadSettings();
+    final eligibility =
+        await LocalAppStateStore.instance.loadCommunityFlagEligibility();
+    if (!mounted) {
+      return;
+    }
+
+    if ((_flagHandleController.text.isEmpty) && eligibility?.handle != null) {
+      _flagHandleController.text = eligibility!.handle!;
+    }
+    if ((_flagPhoneController.text.isEmpty) && eligibility?.phone != null) {
+      _flagPhoneController.text = eligibility!.phone!;
+    }
+
+    setState(() {
+      _settings = settings;
+      _eligibility = eligibility;
+      _loadingState = false;
+    });
+  }
+
+  Future<void> _toggleContribution(bool value) async {
+    final nextSettings = AppSettings(communityContributionEnabled: value);
+    await LocalAppStateStore.instance.saveSettings(nextSettings);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _settings = nextSettings);
+  }
+
   void _runCheck() {
     final q = _checkController.text.trim();
     if (q.isEmpty) return;
-    setState(() => _checkParams = {
-          if (q.startsWith('+') || RegExp(r'^\d').hasMatch(q))
-            'phone': q
-          else
-            'handle': q,
-        });
+    setState(
+      () => _checkParams = CommunityProfileLookupDto(
+        phone: q.startsWith('+') || RegExp(r'^\d').hasMatch(q) ? q : null,
+        handle: q.startsWith('+') || RegExp(r'^\d').hasMatch(q) ? null : q,
+      ),
+    );
   }
 
   void _submitFlag() {
+    if (!_settings.communityContributionEnabled || _eligibility == null) {
+      return;
+    }
+
     final handle = _flagHandleController.text.trim();
-    if (handle.isEmpty) return;
-    setState(() => _flagParams = {
-          'platform': _flagPlatform,
-          'handle': handle,
-          if (_flagPhoneController.text.trim().isNotEmpty)
-            'phone': _flagPhoneController.text.trim(),
-          'flags': _selectedFlags.toList(),
-          'region': _flagRegion,
-        });
+    final phone = _flagPhoneController.text.trim();
+    final effectiveHandle = handle.isNotEmpty ? handle : _eligibility!.handle;
+    final effectivePhone = phone.isNotEmpty ? phone : _eligibility!.phone;
+    final photoHash = _eligibility!.photoHash;
+
+    if ((effectiveHandle == null || effectiveHandle.isEmpty) &&
+        (effectivePhone == null || effectivePhone.isEmpty) &&
+        (photoHash == null || photoHash.isEmpty)) {
+      return;
+    }
+    if (_selectedFlags.isEmpty) {
+      return;
+    }
+
+    setState(
+      () => _flagParams = CommunityFlagRequestDto(
+        platform: _flagPlatform,
+        handle: effectiveHandle,
+        phone: effectivePhone,
+        photoHash: photoHash,
+        flags: _selectedFlags.toList(),
+        region: _flagRegion,
+        sourceType: _eligibility!.sourceType,
+        sourceRiskLevel: _eligibility!.sourceRiskLevel,
+        sourceSessionId: _eligibility!.sourceSessionId,
+      ),
+    );
   }
 
   @override
@@ -89,6 +154,35 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           Text(
             'Check if a profile has been reported, or flag a confirmed scammer.',
             style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: AppTheme.tonalSection(),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Community contribution', style: AppTheme.headline(11)),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Turn this off to keep your future scan results local only.',
+                        style: AppTheme.body(
+                          10,
+                          color: AppTheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _settings.communityContributionEnabled,
+                  onChanged: _toggleContribution,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -141,11 +235,23 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           Text('FLAG SCAMMER',
               style: AppTheme.label(9, color: AppTheme.onSurfaceVariant)),
           const SizedBox(height: 8),
-          if (_flagParams != null)
+          if (_loadingState)
+            const LinearProgressIndicator(color: AppTheme.primaryContainer)
+          else if (!_settings.communityContributionEnabled)
+            _InlineNotice(
+              message:
+                  'Community contribution is disabled. Enable it above to submit reports.',
+            )
+          else if (_eligibility == null || !_eligibility!.isEligible)
+            _InlineNotice(
+              message:
+                  'Complete a Medium, High, or Critical chat scan/background check first to unlock reporting.',
+            )
+          else if (_flagParams != null)
             _FlagResult(params: _flagParams!)
           else ...[
             DropdownButtonFormField<String>(
-              value: _flagPlatform,
+              initialValue: _flagPlatform,
               style: AppTheme.body(13),
               decoration: const InputDecoration(
                 labelText: 'Platform',
@@ -178,6 +284,34 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
               ),
               keyboardType: TextInputType.phone,
             ),
+            if (_eligibility != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: AppTheme.tonalSection(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Eligible source', style: AppTheme.headline(11)),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_eligibility!.sourceType} · ${_eligibility!.sourceRiskLevel}',
+                      style: AppTheme.body(10, color: AppTheme.onSurfaceVariant),
+                    ),
+                    if (_eligibility!.photoHash != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Photo hash match available for submission.',
+                        style: AppTheme.body(
+                          10,
+                          color: AppTheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Text('FLAG TYPE',
                 style:
@@ -199,7 +333,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _flagRegion,
+              initialValue: _flagRegion,
               style: AppTheme.body(13),
               decoration: const InputDecoration(
                 labelText: 'Region',
@@ -227,7 +361,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
 // ── Check Result Widget ───────────────────────────────────────────────────────
 
 class _CheckResult extends ConsumerWidget {
-  final Map<String, String> params;
+  final CommunityProfileLookupDto params;
   const _CheckResult({required this.params});
 
   @override
@@ -328,7 +462,7 @@ class _FlaggedCard extends StatelessWidget {
 // ── Flag Result Widget ────────────────────────────────────────────────────────
 
 class _FlagResult extends ConsumerWidget {
-  final Map<String, dynamic> params;
+  final CommunityFlagRequestDto params;
   const _FlagResult({required this.params});
 
   @override
@@ -396,6 +530,36 @@ class _GradientButton extends StatelessWidget {
                     color: Colors.white)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InlineNotice extends StatelessWidget {
+  final String message;
+  const _InlineNotice({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.tonalSection(),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline,
+            size: 15,
+            color: AppTheme.primaryContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+            ),
+          ),
+        ],
       ),
     );
   }

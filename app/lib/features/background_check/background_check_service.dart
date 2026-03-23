@@ -1,26 +1,23 @@
 // Owner: Member 1
 import '../../core/api/api_client.dart';
 import '../../core/models/background_check_result.dart';
+import '../../core/models/requests.dart';
 
 class BackgroundCheckService {
   final _client = ApiClient.instance;
 
   /// Run a background check on a profile.
-  /// TODO (Member 1): This calls the mock backend — no changes needed here.
-  /// Implement the real pipeline in backend/services/osint/.
-  Future<BackgroundCheckResult> runBackgroundCheck({
-    required String username,
-    required String platform,
-    String? phone,
-    String? photoB64,
-  }) async {
+  Future<BackgroundCheckResult> runBackgroundCheck(
+    BackgroundCheckRequestDto request,
+  ) async {
     final response = await _client.dio.post(
       '/background-check',
       data: {
-        'username': username,
-        'platform': platform,
-        if (phone != null) 'phone': phone,
-        if (photoB64 != null) 'photo_b64': photoB64,
+        'username': request.username,
+        'platform': request.platform,
+        if (request.phone != null) 'phone': request.phone,
+        if (request.photoB64 != null) 'photo_b64': request.photoB64,
+        if (request.profileUrl != null) 'profile_url': request.profileUrl,
       },
     );
     return BackgroundCheckResult.fromJson(

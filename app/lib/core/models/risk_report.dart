@@ -14,6 +14,12 @@ class RedFlag {
         evidence: json['evidence'] as String,
         severity: json['severity'] as String,
       );
+
+  Map<String, dynamic> toJson() => {
+        'pattern': pattern,
+        'evidence': evidence,
+        'severity': severity,
+      };
 }
 
 class RiskReport {
@@ -42,4 +48,12 @@ class RiskReport {
             .map((e) => e as String)
             .toList(),
       );
+
+  Map<String, dynamic> toJson() => {
+        'risk_level': riskLevel,
+        'risk_score': riskScore,
+        'red_flags': redFlags.map((flag) => flag.toJson()).toList(),
+        'summary': summary,
+        'recommended_actions': recommendedActions,
+      };
 }

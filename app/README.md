@@ -1,16 +1,27 @@
-# fake_love_detector
+# What is Fake Love Desktop App
 
-A new Flutter project.
+Flutter desktop shell for the local romance-scam detection product.
 
-## Getting Started
+## Run
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run -d macos
+```
 
-A few resources to get you started if this is your first Flutter project:
+The app expects the FastAPI backend to be running at `http://127.0.0.1:8000`.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Current Features
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Chat monitor with silent screen capture and backend analysis
+- Background check with live SSE progress updates
+- Community lookup and gated reporting flow
+- Video monitor shell and backend integration hooks
+
+## Project Layout
+
+- `lib/core/`: shared API, models, theme, and local state
+- `lib/features/chat_monitor/`: capture + chat scan flow
+- `lib/features/background_check/`: dossier + streaming OSINT flow
+- `lib/features/community/`: community search and gated report submission
+- `lib/features/video_monitor/`: video-call monitoring flow

@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/models/app_state.dart';
 import '../../core/models/background_check_result.dart';
 import '../../core/models/community_flag.dart';
+import '../../core/models/requests.dart';
+import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../community/community_provider.dart';
 import 'background_check_provider.dart';
 import 'background_check_stream_provider.dart';
+import 'background_check_utils.dart';
 
 class BackgroundCheckScreen extends ConsumerStatefulWidget {
   const BackgroundCheckScreen({super.key});
@@ -28,10 +32,11 @@ class _BackgroundCheckScreenState
   bool _showManualFields = false;
 
   // Manual path (FutureProvider)
-  Map<String, String>? _params;
+  BackgroundCheckRequestDto? _params;
   // URL path (StreamProvider)
-  Map<String, String>? _streamParams;
+  BackgroundCheckStreamRequestDto? _streamParams;
   final List<BackgroundCheckEvent> _streamEvents = [];
+  String? _lastEligibilitySessionId;
 
   static const _platforms = [
     'X',
@@ -62,22 +67,22 @@ class _BackgroundCheckScreenState
       setState(() {
         _streamEvents.clear();
         _params = null;
-        _streamParams = {
-          'profile_url': url,
-          if (username.isNotEmpty) 'username': username,
-          'platform': _selectedPlatform,
-          if (phone.isNotEmpty) 'phone': phone,
-        };
+        _streamParams = BackgroundCheckStreamRequestDto(
+          profileUrl: url,
+          username: username,
+          platform: _selectedPlatform,
+          phone: phone.isNotEmpty ? phone : null,
+        );
       });
     } else {
       // Manual mode — FutureProvider
       setState(() {
         _streamParams = null;
-        _params = {
-          'username': username,
-          'platform': _selectedPlatform,
-          if (phone.isNotEmpty) 'phone': phone,
-        };
+        _params = BackgroundCheckRequestDto(
+          username: username,
+          platform: _selectedPlatform,
+          phone: phone.isNotEmpty ? phone : null,
+        );
       });
     }
   }
@@ -87,6 +92,7 @@ class _BackgroundCheckScreenState
       _params = null;
       _streamParams = null;
       _streamEvents.clear();
+      _lastEligibilitySessionId = null;
     });
   }
 
@@ -213,7 +219,7 @@ class _BackgroundCheckScreenState
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: _selectedPlatform,
+              initialValue: _selectedPlatform,
               style: AppTheme.body(13),
               decoration: const InputDecoration(
                 labelText: 'Platform',
@@ -352,9 +358,16 @@ class _BackgroundCheckScreenState
   // ── Results ───────────────────────────────────────────────────────────────
 
   Widget _buildResult(BackgroundCheckResult data) {
-    final communityAsync = data.photoHash != null
-        ? ref.watch(profileCheckProvider({'photo_hash': data.photoHash!}))
-        : null;
+    final phones = data.discoveredIdentifiers?.phones ?? const <String>[];
+    _persistCommunityEligibility(data);
+
+    final lookup = CommunityProfileLookupDto(
+      handle: data.scrapedProfile?.username,
+      phone: _params?.phone ?? (phones.isNotEmpty ? phones.first : null),
+      photoHash: data.photoHash,
+    );
+    final communityAsync =
+        lookup.hasIdentifier ? ref.watch(profileCheckProvider(lookup)) : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -396,7 +409,7 @@ class _BackgroundCheckScreenState
                 )
               : const _GreenCheck('No online matches found'),
         ),
-        if (_params?.containsKey('phone') == true) ...[
+        if (_params?.phone != null) ...[
           const SizedBox(height: 8),
           _ResultSection(
             title: 'Phone Validation',
@@ -491,6 +504,56 @@ class _BackgroundCheckScreenState
       ],
     );
   }
+
+  void _persistCommunityEligibility(BackgroundCheckResult data) {
+    final riskLevel = data.riskLevel ?? _riskLevelFromConsistencyScore(
+      data.profileConsistencyScore,
+    );
+    final sessionId = _streamParams?.profileUrl ?? _params?.username ?? 'background-check';
+    if (_lastEligibilitySessionId == sessionId) {
+      return;
+    }
+
+    _lastEligibilitySessionId = sessionId;
+    if (!isRiskLevelEligibleForCommunity(riskLevel)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        LocalAppStateStore.instance.clearCommunityFlagEligibility();
+      });
+      return;
+    }
+
+    final handles = data.discoveredIdentifiers?.handles ?? const [];
+    final phones = data.discoveredIdentifiers?.phones ?? const <String>[];
+    final handle = data.scrapedProfile?.username ??
+        (handles.isNotEmpty ? handles.first : null);
+    final phone = _params?.phone ?? (phones.isNotEmpty ? phones.first : null);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      LocalAppStateStore.instance.saveCommunityFlagEligibility(
+        CommunityFlagEligibility(
+          sourceType: 'background_check',
+          sourceRiskLevel: riskLevel,
+          sourceSessionId: sessionId,
+          handle: handle,
+          phone: phone,
+          photoHash: data.photoHash,
+        ),
+      );
+    });
+  }
+}
+
+String _riskLevelFromConsistencyScore(int score) {
+  if (score < 20) {
+    return 'CRITICAL';
+  }
+  if (score < 40) {
+    return 'HIGH';
+  }
+  if (score < 70) {
+    return 'MEDIUM';
+  }
+  return 'LOW';
 }
 
 // ── Shared Widgets ────────────────────────────────────────────────────────────

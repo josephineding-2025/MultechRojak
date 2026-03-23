@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/models/background_check_result.dart';
+import '../../core/models/requests.dart';
 
 // ---------------------------------------------------------------------------
 // Event model
@@ -69,34 +70,20 @@ class BackgroundCheckEvent {
 // StreamProvider
 // ---------------------------------------------------------------------------
 
-/// Streams [BackgroundCheckEvent]s from the SSE endpoint.
-///
-/// Pass a Map with:
-///   'profile_url'  (required)
-///   'username'     (optional)
-///   'platform'     (optional)
-///   'phone'        (optional)
 final backgroundCheckStreamProvider = StreamProvider.autoDispose
-    .family<BackgroundCheckEvent, Map<String, String>>(
+    .family<BackgroundCheckEvent, BackgroundCheckStreamRequestDto>(
   (ref, params) => _streamBackgroundCheck(params),
 );
 
 Stream<BackgroundCheckEvent> _streamBackgroundCheck(
-    Map<String, String> params) async* {
+    BackgroundCheckStreamRequestDto params) async* {
   final dio = ApiClient.instance.dio;
-
-  final queryParams = <String, String>{};
-  for (final entry in params.entries) {
-    if (entry.value.isNotEmpty) {
-      queryParams[entry.key] = entry.value;
-    }
-  }
 
   Response<ResponseBody> response;
   try {
     response = await dio.get<ResponseBody>(
       '/background-check/stream',
-      queryParameters: queryParams,
+      queryParameters: params.toQueryParameters(),
       options: Options(
         responseType: ResponseType.stream,
         receiveTimeout: const Duration(minutes: 5),

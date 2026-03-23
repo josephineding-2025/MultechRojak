@@ -20,6 +20,9 @@ class FlagScammerRequest(BaseModel):
     photo_hash: Optional[str] = None
     flags: List[str]
     region: str
+    source_type: str
+    source_risk_level: str
+    source_session_id: str
 
 
 class FlagScammerResult(BaseModel):
@@ -42,6 +45,17 @@ async def flag_scammer(req: FlagScammerRequest) -> FlagScammerResult:
     """
     Submit a community flag for a scammer profile.
     """
+    if req.source_risk_level.upper() not in {"MEDIUM", "HIGH", "CRITICAL"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Community reporting is only allowed after a Medium, High, or Critical scan.",
+        )
+    if not req.source_session_id.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="source_session_id is required for gated community reports",
+        )
+
     try:
         result = submit_scammer_report(
             platform=req.platform,

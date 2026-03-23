@@ -1,10 +1,18 @@
 // Owner: Member 2
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/api/api_error.dart';
+import '../../core/models/app_state.dart';
+import '../../core/models/requests.dart';
 import '../../core/models/risk_report.dart';
+import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
+import '../background_check/background_check_utils.dart';
+import 'chat_capture_controller.dart';
 import 'chat_monitor_provider.dart';
 
 enum _ScanState { idle, scanning, analyzing, report, error }
@@ -17,47 +25,151 @@ class ChatMonitorScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
+  static const _captureInterval = Duration(milliseconds: 500);
+  static const _maxFramesForAnalysis = 24;
+  static const _platforms = ['WhatsApp', 'Telegram', 'Instagram', 'Dating App', 'Other'];
+
   _ScanState _state = _ScanState.idle;
   int _frameCount = 0;
   RiskReport? _report;
   String? _errorMessage;
+  String _selectedPlatform = _platforms.first;
+  Timer? _captureTimer;
+  final _captureController = ChatCaptureController();
 
-  // Simulated session id — real implementation collects frames via screen_capturer
-  final String _sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+  String _sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
   final List<String> _frames = [];
 
-  void _startScan() => setState(() {
-        _state = _ScanState.scanning;
-        _frameCount = 0;
-        _frames.clear();
+  @override
+  void dispose() {
+    _captureTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startScan() async {
+    final hasAccess = await _captureController.ensureCaptureAccess();
+    if (!hasAccess) {
+      setState(() {
+        _errorMessage =
+            'Screen capture permission is required before scanning chats.';
+        _state = _ScanState.error;
       });
+      return;
+    }
+
+    _captureTimer?.cancel();
+    _captureController.reset();
+    _sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+    setState(() {
+      _state = _ScanState.scanning;
+      _frameCount = 0;
+      _errorMessage = null;
+      _report = null;
+      _frames.clear();
+    });
+
+    _captureTimer = Timer.periodic(_captureInterval, (_) async {
+      if (!mounted || _state != _ScanState.scanning) {
+        return;
+      }
+
+      try {
+        final frame = await _captureController.captureChangedFrame();
+        if (frame == null) {
+          return;
+        }
+
+        setState(() {
+          _frames.add(frame);
+          _frameCount = _frames.length;
+        });
+      } catch (error) {
+        _captureTimer?.cancel();
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _errorMessage = 'Failed to capture the screen: $error';
+          _state = _ScanState.error;
+        });
+      }
+    });
+  }
 
   Future<void> _analyze() async {
+    _captureTimer?.cancel();
+    if (_frames.isEmpty) {
+      setState(() {
+        _errorMessage =
+            'No changed frames were captured yet. Scroll the conversation before analyzing.';
+        _state = _ScanState.error;
+      });
+      return;
+    }
+
     setState(() => _state = _ScanState.analyzing);
     try {
+      final framesForAnalysis = _selectFramesForAnalysis(_frames);
       final result = await ref.read(
-        chatAnalysisProvider({
-          'platform': 'Unknown',
-          'session_id': _sessionId,
-        }).future,
+        chatAnalysisProvider(
+          ChatAnalysisRequestDto(
+            platform: _selectedPlatform,
+            sessionId: _sessionId,
+            frames: framesForAnalysis,
+          ),
+        ).future,
       );
+      await LocalAppStateStore.instance.saveLatestChatReport(result);
+      if (isRiskLevelEligibleForCommunity(result.riskLevel)) {
+        await LocalAppStateStore.instance.saveCommunityFlagEligibility(
+          CommunityFlagEligibility(
+            sourceType: 'chat',
+            sourceRiskLevel: result.riskLevel,
+            sourceSessionId: _sessionId,
+          ),
+        );
+      } else {
+        await LocalAppStateStore.instance.clearCommunityFlagEligibility();
+      }
       setState(() {
         _report = result;
         _state = _ScanState.report;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = formatApiError(
+          e,
+          fallbackMessage: 'Chat analysis failed. Check the backend logs.',
+        );
         _state = _ScanState.error;
       });
     }
   }
 
+  List<String> _selectFramesForAnalysis(List<String> frames) {
+    if (frames.length <= _maxFramesForAnalysis) {
+      return List<String>.unmodifiable(frames);
+    }
+
+    final selected = <String>[];
+    final lastIndex = frames.length - 1;
+    final step = lastIndex / (_maxFramesForAnalysis - 1);
+
+    for (var i = 0; i < _maxFramesForAnalysis; i += 1) {
+      final index = (i * step).round().clamp(0, lastIndex);
+      selected.add(frames[index]);
+    }
+
+    return List<String>.unmodifiable(selected);
+  }
+
   void _reset() => setState(() {
+        _captureTimer?.cancel();
         _state = _ScanState.idle;
         _report = null;
         _errorMessage = null;
         _frames.clear();
+        _frameCount = 0;
       });
 
   @override
@@ -93,6 +205,25 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
           style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
         ),
         const SizedBox(height: 20),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedPlatform,
+          style: AppTheme.body(13),
+          decoration: const InputDecoration(
+            labelText: 'Platform',
+            prefixIcon: Icon(Icons.chat_bubble_outline, size: 18),
+          ),
+          items: _platforms
+              .map((platform) =>
+                  DropdownMenuItem(value: platform, child: Text(platform)))
+              .toList(),
+          onChanged: (value) {
+            if (value == null) {
+              return;
+            }
+            setState(() => _selectedPlatform = value);
+          },
+        ),
+        const SizedBox(height: 12),
         _GradientButton(
           label: 'Start Scan',
           icon: Icons.radar,
@@ -149,7 +280,7 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Scroll through the conversation now. Press Analyze when done.',
+          'Scroll through the conversation now. We only keep changed frames in memory. Press Analyze when done.',
           style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
           textAlign: TextAlign.center,
         ),

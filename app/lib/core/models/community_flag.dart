@@ -15,6 +15,12 @@ class FlagScammerResult {
         profileStatus: json['profile_status'] as String,
         totalReports: json['total_reports'] as int,
       );
+
+  Map<String, dynamic> toJson() => {
+        'success': success,
+        'profile_status': profileStatus,
+        'total_reports': totalReports,
+      };
 }
 
 class ProfileCheckResult {
@@ -45,4 +51,13 @@ class ProfileCheckResult {
             .toList(),
         region: json['region'] as String?,
       );
+
+  Map<String, dynamic> toJson() => {
+        'flagged': flagged,
+        'status': status,
+        'report_count': reportCount,
+        'first_reported': firstReported,
+        'common_flags': commonFlags,
+        'region': region,
+      };
 }

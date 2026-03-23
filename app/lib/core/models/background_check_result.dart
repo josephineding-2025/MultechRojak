@@ -36,6 +36,18 @@ class ScrapedProfile {
         scrapeError: json['scrape_error'] as String?,
         rawUrl: json['raw_url'] as String?,
       );
+
+  Map<String, dynamic> toJson() => {
+        'platform': platform,
+        'username': username,
+        'bio_text': bioText,
+        'follower_count': followerCount,
+        'following_count': followingCount,
+        'account_age_days': accountAgeDays,
+        'post_count': postCount,
+        'scrape_error': scrapeError,
+        'raw_url': rawUrl,
+      };
 }
 
 class DiscoveredIdentifiers {
@@ -62,6 +74,14 @@ class DiscoveredIdentifiers {
         locationClaim: json['location_claim'] as String?,
         occupationClaim: json['occupation_claim'] as String?,
       );
+
+  Map<String, dynamic> toJson() => {
+        'phones': phones,
+        'emails': emails,
+        'handles': handles,
+        'location_claim': locationClaim,
+        'occupation_claim': occupationClaim,
+      };
 }
 
 class DossierFinding {
@@ -83,6 +103,13 @@ class DossierFinding {
         flag: json['flag'] as String,
         evidence: json['evidence'] as String,
       );
+
+  Map<String, dynamic> toJson() => {
+        'category': category,
+        'severity': severity,
+        'flag': flag,
+        'evidence': evidence,
+      };
 }
 
 // ---------------------------------------------------------------------------
@@ -165,4 +192,25 @@ class BackgroundCheckResult {
             .map((e) => DossierFinding.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+
+  Map<String, dynamic> toJson() => {
+        'photo_found_online': photoFoundOnline,
+        'photo_sources': photoSources,
+        'username_platforms': usernamePlatforms,
+        'phone_valid': phoneValid,
+        'phone_country': phoneCountry,
+        'phone_carrier': phoneCarrier,
+        'profile_consistency_score': profileConsistencyScore,
+        'background_summary': backgroundSummary,
+        'platform_verified': platformVerified,
+        'platform_followers': platformFollowers,
+        'platform_account_age_days': platformAccountAgeDays,
+        'authenticity_note': authenticityNote,
+        'photo_hash': photoHash,
+        'confidence_score': confidenceScore,
+        'risk_level': riskLevel,
+        'scraped_profile': scrapedProfile?.toJson(),
+        'discovered_identifiers': discoveredIdentifiers?.toJson(),
+        'findings': findings.map((finding) => finding.toJson()).toList(),
+      };
 }

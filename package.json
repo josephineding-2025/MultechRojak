@@ -1,11 +1,14 @@
 {
-  "name": "multechrojak",
+  "name": "what-is-fake-love",
   "version": "1.0.0",
-  "description": "",
-  "main": "backend/scammer database/server.js",
+  "description": "Local Flutter + FastAPI desktop app for romance scam detection.",
+  "private": true,
+  "main": "backend/main.py",
   "scripts": {
-    "start": "node \"backend/scammer database/server.js\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start:backend": "cd backend && uvicorn main:app --reload",
+    "start:app": "cd app && flutter run -d macos",
+    "start:legacy-community": "node \"backend/scammer database/server.js\"",
+    "test": "echo \"No Node.js test suite configured. Use flutter test or backend pytest.\" && exit 1"
   },
   "repository": {
     "type": "git",
