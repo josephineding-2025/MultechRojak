@@ -196,7 +196,28 @@ def run_background_check(
     platform: str,
     phone: Optional[str] = None,
     photo_b64: Optional[str] = None,
+    scraped_data: Optional[dict] = None,
 ) -> dict:
+    # --- Merge scraped data with manual inputs ---
+    effective_photo_b64 = photo_b64
+    effective_phone = phone
+    discovered_identifiers: Optional[dict] = None
+
+    if scraped_data:
+        if not effective_photo_b64 and scraped_data.get("photo_b64"):
+            effective_photo_b64 = scraped_data["photo_b64"]
+        bio = (scraped_data.get("parsed_bio") or {})
+        bio_phones = bio.get("phone_numbers") or []
+        if not effective_phone and bio_phones:
+            effective_phone = bio_phones[0]
+        discovered_identifiers = {
+            "phones": bio_phones,
+            "emails": bio.get("emails") or [],
+            "handles": bio.get("linked_handles") or [],
+            "location_claim": bio.get("location_claim"),
+            "occupation_claim": bio.get("occupation_claim"),
+        }
+
     if not username or not username.strip():
         raise ValueError("username must not be empty")
 
@@ -207,9 +228,9 @@ def run_background_check(
     phone_valid = False
     phone_country = ""
     phone_carrier: Optional[str] = None
-    if phone and phone.strip():
+    if effective_phone and effective_phone.strip():
         try:
-            phone_result = validate_phone(phone.strip())
+            phone_result = validate_phone(effective_phone.strip())
             phone_valid = phone_result["valid"]
             phone_country = phone_result["country_name"]
             phone_carrier = phone_result["carrier"]
@@ -219,18 +240,18 @@ def run_background_check(
     # --- Photo / reverse image search ---
     photo_found_online = False
     photo_sources: list[str] = []
-    if photo_b64 and photo_b64.strip():
+    if effective_photo_b64 and effective_photo_b64.strip():
         try:
-            photo_sources = reverse_image_search(photo_b64)
+            photo_sources = reverse_image_search(effective_photo_b64)
             photo_found_online = len(photo_sources) > 0
         except (RuntimeError, ValueError):
             pass
 
     # --- Photo hash (for community cross-check) ---
     photo_hash: Optional[str] = None
-    if photo_b64 and photo_b64.strip():
+    if effective_photo_b64 and effective_photo_b64.strip():
         try:
-            photo_hash = compute_phash(photo_b64)
+            photo_hash = compute_phash(effective_photo_b64)
         except ValueError:
             pass
 
@@ -250,21 +271,95 @@ def run_background_check(
         total_deductions += WEIGHT_USERNAME
 
     # Phone: only counts if provided
-    if phone and phone.strip():
+    if effective_phone and effective_phone.strip():
         total_possible += WEIGHT_PHONE
         if not phone_valid:
             total_deductions += WEIGHT_PHONE
 
     # Photo: only counts if provided
-    if photo_b64 and photo_b64.strip():
+    if effective_photo_b64 and effective_photo_b64.strip():
         total_possible += WEIGHT_PHOTO
         if photo_found_online:
             extra = len(photo_sources) - 1
             photo_deduction = 15 + min(extra * 5, 15)  # 15 base + up to 15 more
             total_deductions += min(photo_deduction, WEIGHT_PHOTO)
 
+    # --- Account velocity scoring (from scraped data) ---
+    follower_velocity_flag = False
+    daily_follower_rate: Optional[float] = None
+    if scraped_data:
+        follower_count = scraped_data.get("follower_count")
+        account_age_days = scraped_data.get("account_age_days")
+        if follower_count is not None and account_age_days is not None and account_age_days > 0:
+            daily_follower_rate = follower_count / account_age_days
+            if daily_follower_rate > 100:
+                follower_velocity_flag = True
+                total_possible += 10
+                total_deductions += 10
+
     score = round(((total_possible - total_deductions) / total_possible) * 100)
     score = max(0, min(100, score))
+
+    # --- Risk level ---
+    if score >= 70:
+        risk_level = "LOW"
+    elif score >= 40:
+        risk_level = "MEDIUM"
+    else:
+        risk_level = "HIGH"
+
+    # --- Findings list ---
+    findings: list[dict] = []
+
+    if photo_found_online:
+        severity = "critical" if len(photo_sources) > 2 else "high"
+        findings.append({
+            "category": "photo",
+            "severity": severity,
+            "flag": f"Profile photo found on {len(photo_sources)} external site(s)",
+            "evidence": f"Sources: {', '.join(photo_sources[:3])}",
+        })
+
+    if effective_phone and effective_phone.strip() and not phone_valid:
+        findings.append({
+            "category": "phone",
+            "severity": "medium",
+            "flag": "Phone number is invalid or unverified",
+            "evidence": f"NumVerify returned invalid for {effective_phone}",
+        })
+
+    if effective_phone and phone_valid and phone_country:
+        location_claim = (discovered_identifiers or {}).get("location_claim") or ""
+        if location_claim and phone_country.lower() not in location_claim.lower():
+            findings.append({
+                "category": "phone",
+                "severity": "high",
+                "flag": f"Phone country mismatch — registered in {phone_country}",
+                "evidence": f"Claimed location: '{location_claim}', phone country: '{phone_country}'",
+            })
+
+    if follower_velocity_flag and daily_follower_rate is not None:
+        findings.append({
+            "category": "account",
+            "severity": "medium",
+            "flag": "Suspicious follower growth velocity",
+            "evidence": f"{daily_follower_rate:.0f} followers/day — consistent with purchased followers",
+        })
+
+    if len(username_platforms) == 0:
+        findings.append({
+            "category": "username",
+            "severity": "low",
+            "flag": "No platform presence found for this username",
+            "evidence": "Sherlock search returned no matches across 400+ platforms",
+        })
+    elif len(username_platforms) >= 50:
+        findings.append({
+            "category": "username",
+            "severity": "high",
+            "flag": f"Username found on {len(username_platforms)} platforms — possible bot or impersonation",
+            "evidence": f"Sample platforms: {', '.join(username_platforms[:5])}",
+        })
 
     # --- Summary ---
     parts: list[str] = []
@@ -272,7 +367,7 @@ def run_background_check(
         parts.append(f"Profile photo found on {len(photo_sources)} source(s).")
     else:
         parts.append("No profile photo matches found online.")
-    if phone and phone.strip():
+    if effective_phone and effective_phone.strip():
         if phone_valid:
             parts.append(f"Phone valid, registered in {phone_country} via {phone_carrier or 'unknown carrier'}.")
         else:
@@ -298,4 +393,10 @@ def run_background_check(
         "platform_account_age_days": authenticity["platform_account_age_days"],
         "authenticity_note": authenticity["authenticity_note"],
         "photo_hash": photo_hash,
+        # --- New dossier fields ---
+        "confidence_score": score,
+        "risk_level": risk_level,
+        "scraped_profile": scraped_data,
+        "discovered_identifiers": discovered_identifiers,
+        "findings": findings,
     }

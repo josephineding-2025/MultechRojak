@@ -19,3 +19,8 @@ sherlock-project>=0.16.0
 
 # Community DB
 supabase>=2.4.6
+
+# Scraping + Streaming
+playwright>=1.44.0        # NOTE: after pip install, run: playwright install chromium
+sse-starlette>=1.8.2
+beautifulsoup4>=4.12.3

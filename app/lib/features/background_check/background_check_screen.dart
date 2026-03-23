@@ -8,6 +8,7 @@ import '../../core/models/community_flag.dart';
 import '../../core/theme/app_theme.dart';
 import '../community/community_provider.dart';
 import 'background_check_provider.dart';
+import 'background_check_stream_provider.dart';
 
 class BackgroundCheckScreen extends ConsumerStatefulWidget {
   const BackgroundCheckScreen({super.key});
@@ -20,10 +21,17 @@ class BackgroundCheckScreen extends ConsumerStatefulWidget {
 class _BackgroundCheckScreenState
     extends ConsumerState<BackgroundCheckScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _urlController = TextEditingController();
   final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
   String _selectedPlatform = 'X';
+  bool _showManualFields = false;
+
+  // Manual path (FutureProvider)
   Map<String, String>? _params;
+  // URL path (StreamProvider)
+  Map<String, String>? _streamParams;
+  final List<BackgroundCheckEvent> _streamEvents = [];
 
   static const _platforms = [
     'X',
@@ -37,6 +45,7 @@ class _BackgroundCheckScreenState
 
   @override
   void dispose() {
+    _urlController.dispose();
     _usernameController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -44,16 +53,78 @@ class _BackgroundCheckScreenState
 
   void _onSubmit() {
     if (!_formKey.currentState!.validate()) return;
+    final url = _urlController.text.trim();
+    final username = _usernameController.text.trim();
     final phone = _phoneController.text.trim();
-    setState(() => _params = {
-          'username': _usernameController.text.trim(),
+
+    if (url.isNotEmpty) {
+      // URL mode — stream SSE
+      setState(() {
+        _streamEvents.clear();
+        _params = null;
+        _streamParams = {
+          'profile_url': url,
+          if (username.isNotEmpty) 'username': username,
           'platform': _selectedPlatform,
           if (phone.isNotEmpty) 'phone': phone,
-        });
+        };
+      });
+    } else {
+      // Manual mode — FutureProvider
+      setState(() {
+        _streamParams = null;
+        _params = {
+          'username': username,
+          'platform': _selectedPlatform,
+          if (phone.isNotEmpty) 'phone': phone,
+        };
+      });
+    }
+  }
+
+  void _reset() {
+    setState(() {
+      _params = null;
+      _streamParams = null;
+      _streamEvents.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // ── URL/SSE streaming path ─────────────────────────────────────────────
+    if (_streamParams != null) {
+      final stream = ref.watch(backgroundCheckStreamProvider(_streamParams!));
+      stream.whenData((event) {
+        if (!_streamEvents.any(
+            (e) => e.step == event.step && e.message == event.message)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _streamEvents.add(event));
+          });
+        }
+      });
+
+      final latestResult = _streamEvents
+          .where((e) => e.step == CheckStep.complete && e.result != null)
+          .map((e) => e.result!)
+          .lastOrNull;
+
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildStreamProgress(),
+            if (latestResult != null) ...[
+              const SizedBox(height: 12),
+              _buildResult(latestResult),
+            ],
+          ],
+        ),
+      );
+    }
+
+    // ── Manual FutureProvider path ─────────────────────────────────────────
     final result =
         _params != null ? ref.watch(backgroundCheckProvider(_params!)) : null;
     return SingleChildScrollView(
@@ -87,51 +158,136 @@ class _BackgroundCheckScreenState
           ),
           const SizedBox(height: 4),
           Text(
-            'Verify a profile against public intelligence sources.',
+            'Paste a profile URL for automated analysis, or enter details manually.',
             style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
           ),
           const SizedBox(height: 16),
+          // ── Primary: Profile URL ─────────────────────────────────────────
           TextFormField(
-            controller: _usernameController,
+            controller: _urlController,
             style: AppTheme.body(13),
             decoration: const InputDecoration(
-              labelText: 'Username / Handle',
-              hintText: 'e.g. john_doe123',
-              prefixIcon: Icon(Icons.person_outline, size: 18),
+              labelText: 'Profile URL',
+              hintText: 'e.g. https://instagram.com/john_doe',
+              prefixIcon: Icon(Icons.link, size: 18),
             ),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Username is required' : null,
           ),
           const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            value: _selectedPlatform,
-            style: AppTheme.body(13),
-            decoration: const InputDecoration(
-              labelText: 'Platform',
-              prefixIcon: Icon(Icons.devices_outlined, size: 18),
-            ),
-            items: _platforms
-                .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                .toList(),
-            onChanged: (v) => setState(() => _selectedPlatform = v!),
+          // ── Collapsible manual fields ────────────────────────────────────
+          GestureDetector(
+            onTap: () =>
+                setState(() => _showManualFields = !_showManualFields),
+            child: Row(children: [
+              Icon(
+                _showManualFields
+                    ? Icons.expand_less
+                    : Icons.expand_more,
+                size: 14,
+                color: AppTheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Manual fields (optional)',
+                style: AppTheme.label(11),
+              ),
+            ]),
           ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _phoneController,
-            style: AppTheme.body(13),
-            decoration: const InputDecoration(
-              labelText: 'Phone (optional)',
-              hintText: 'e.g. +60123456789',
-              prefixIcon: Icon(Icons.phone_outlined, size: 18),
+          if (_showManualFields) ...[
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _usernameController,
+              style: AppTheme.body(13),
+              decoration: const InputDecoration(
+                labelText: 'Username / Handle',
+                hintText: 'e.g. john_doe123',
+                prefixIcon: Icon(Icons.person_outline, size: 18),
+              ),
+              validator: (v) {
+                // Username required only when no URL provided
+                final url = _urlController.text.trim();
+                if (url.isEmpty && (v == null || v.trim().isEmpty)) {
+                  return 'Enter a URL or username';
+                }
+                return null;
+              },
             ),
-            keyboardType: TextInputType.phone,
-          ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: _selectedPlatform,
+              style: AppTheme.body(13),
+              decoration: const InputDecoration(
+                labelText: 'Platform',
+                prefixIcon: Icon(Icons.devices_outlined, size: 18),
+              ),
+              items: _platforms
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedPlatform = v!),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _phoneController,
+              style: AppTheme.body(13),
+              decoration: const InputDecoration(
+                labelText: 'Phone (optional)',
+                hintText: 'e.g. +60123456789',
+                prefixIcon: Icon(Icons.phone_outlined, size: 18),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+          ],
           const SizedBox(height: 20),
           _GradientButton(
             label: 'Run Background Check',
             icon: Icons.search,
             onPressed: _onSubmit,
           ),
+        ],
+      ),
+    );
+  }
+
+  // ── Streaming progress panel ───────────────────────────────────────────────
+
+  Widget _buildStreamProgress() {
+    final isComplete = _streamEvents.any((e) => e.step == CheckStep.complete);
+    final hasError = _streamEvents.any((e) => e.step == CheckStep.error);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.tonalSection(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.radar, size: 13, color: AppTheme.primaryContainer),
+            const SizedBox(width: 6),
+            Text('Live Analysis', style: AppTheme.headline(11)),
+            const Spacer(),
+            if (isComplete || hasError)
+              GestureDetector(
+                onTap: _reset,
+                child: Text('New Search',
+                    style: AppTheme.label(10,
+                        color: AppTheme.primaryContainer)),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          if (_streamEvents.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: LinearProgressIndicator(
+                  color: AppTheme.primaryContainer),
+            )
+          else ...[
+            ..._streamEvents.map((e) => _StreamEventRow(event: e)),
+            if (!isComplete && !hasError)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: LinearProgressIndicator(
+                    color: AppTheme.primaryContainer),
+              ),
+          ],
         ],
       ),
     );
@@ -186,7 +342,7 @@ class _BackgroundCheckScreenState
         ),
         const SizedBox(height: 16),
         OutlinedButton(
-          onPressed: () => setState(() => _params = null),
+          onPressed: _reset,
           child: const Text('Try Again'),
         ),
       ],
@@ -288,6 +444,14 @@ class _BackgroundCheckScreenState
           icon: Icons.verified_user_outlined,
           child: _AuthenticitySection(data: data),
         ),
+        if (data.findings.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _ResultSection(
+            title: 'Risk Findings',
+            icon: Icons.flag_outlined,
+            child: _FindingsSection(findings: data.findings),
+          ),
+        ],
         if (communityAsync != null) ...[
           const SizedBox(height: 8),
           _ResultSection(
@@ -320,7 +484,7 @@ class _BackgroundCheckScreenState
         ),
         const SizedBox(height: 16),
         OutlinedButton(
-          onPressed: () => setState(() => _params = null),
+          onPressed: _reset,
           child: const Text('New Search'),
         ),
         const SizedBox(height: 8),
@@ -580,6 +744,126 @@ class _AuthenticitySection extends StatelessWidget {
               Text(note, style: AppTheme.body(11, color: textColor)),
         ),
       ],
+    );
+  }
+}
+
+// ── Stream Event Row ──────────────────────────────────────────────────────────
+
+class _StreamEventRow extends StatelessWidget {
+  final BackgroundCheckEvent event;
+  const _StreamEventRow({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final IconData iconData;
+    final Color iconColor;
+    if (event.step == CheckStep.complete) {
+      iconData = Icons.check_circle;
+      iconColor = const Color(0xFF2E7D32);
+    } else if (event.step == CheckStep.error) {
+      iconData = Icons.error_outline;
+      iconColor = AppTheme.error;
+    } else if (event.isFlag) {
+      final sev = event.severity ?? '';
+      iconColor = sev == 'critical' || sev == 'high'
+          ? AppTheme.error
+          : const Color(0xFFF57F17);
+      iconData = Icons.warning_amber_rounded;
+    } else if (event.status == 'started') {
+      iconData = Icons.hourglass_empty;
+      iconColor = AppTheme.onSurfaceVariant;
+    } else {
+      iconData = Icons.check_circle_outline;
+      iconColor = AppTheme.primaryContainer;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(iconData, size: 12, color: iconColor),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(event.message,
+                style: AppTheme.body(11,
+                    color: event.isFlag
+                        ? AppTheme.onSurface
+                        : AppTheme.onSurfaceVariant)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Findings Section ──────────────────────────────────────────────────────────
+
+class _FindingsSection extends StatelessWidget {
+  final List<DossierFinding> findings;
+  const _FindingsSection({required this.findings});
+
+  static int _rank(String s) =>
+      const {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}[s] ?? 4;
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...findings]
+      ..sort((a, b) => _rank(a.severity).compareTo(_rank(b.severity)));
+    return Column(
+      children: sorted.map((f) => _FindingRow(finding: f)).toList(),
+    );
+  }
+}
+
+class _FindingRow extends StatelessWidget {
+  final DossierFinding finding;
+  const _FindingRow({required this.finding});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color chipColor;
+    final Color chipBg;
+    switch (finding.severity) {
+      case 'critical':
+      case 'high':
+        chipColor = AppTheme.error;
+        chipBg = AppTheme.errorContainer;
+      case 'medium':
+        chipColor = const Color(0xFFF57F17);
+        chipBg = const Color(0xFFFFF3E0);
+      default:
+        chipColor = AppTheme.primaryContainer;
+        chipBg = const Color(0xFFE3F2FD);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _StatusChip(
+              label: finding.severity.toUpperCase(),
+              color: chipColor,
+              bg: chipBg),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(finding.flag,
+                    style: AppTheme.body(11,
+                        weight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(finding.evidence,
+                    style: AppTheme.body(10,
+                        color: AppTheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
