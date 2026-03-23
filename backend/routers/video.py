@@ -10,6 +10,13 @@ from services.llm import analyze_audio_chunk, analyze_video_frame
 router = APIRouter(tags=["Video Monitor"])
 
 
+def _status_code_for_value_error(exc: ValueError) -> int:
+    message = str(exc)
+    if "is missing. Set it in your .env file." in message:
+        return 500
+    return 400
+
+
 class VideoFrameRequest(BaseModel):
     frame: str  # base64-encoded image
     session_id: str
@@ -42,7 +49,7 @@ async def analyze_video_frame_endpoint(req: VideoFrameRequest) -> VideoAlert:
     try:
         result = analyze_video_frame(frame=req.frame, session_id=req.session_id)
     except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=_status_code_for_value_error(exc), detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail="Failed to analyze video frame") from exc
 
@@ -58,7 +65,7 @@ async def analyze_audio_chunk_endpoint(req: AudioChunkRequest) -> AudioAlert:
     try:
         result = analyze_audio_chunk(audio_b64=req.audio_b64, session_id=req.session_id)
     except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=_status_code_for_value_error(exc), detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail="Failed to analyze audio chunk") from exc
 
