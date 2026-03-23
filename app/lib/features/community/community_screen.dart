@@ -254,12 +254,12 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _selectedPlatform,
+                initialValue: _selectedPlatform,
                 decoration: const InputDecoration(
                   labelText: 'Platform',
                   isDense: true,
                 ),
-                style: const TextStyle(fontSize: 12, color: Colors.black87),
+                style: const TextStyle(fontSize: 12, color: Color.fromARGB(255, 246, 197, 197)),
                 items: _platforms
                     .map((platform) => DropdownMenuItem(value: platform, child: Text(platform)))
                     .toList(),
@@ -304,12 +304,12 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: _selectedRegion,
+                initialValue: _selectedRegion,
                 decoration: const InputDecoration(
                   labelText: 'Region',
                   isDense: true,
                 ),
-                style: const TextStyle(fontSize: 12, color: Colors.black87),
+                style: const TextStyle(fontSize: 12, color: Color.fromARGB(255, 248, 199, 199)),
                 items: _regions
                     .map((region) => DropdownMenuItem(value: region, child: Text(region)))
                     .toList(),

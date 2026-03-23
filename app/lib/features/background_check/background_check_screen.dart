@@ -79,12 +79,12 @@ class _BackgroundCheckScreenState extends ConsumerState<BackgroundCheckScreen> {
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
-            value: _selectedPlatform,
+            initialValue: _selectedPlatform,
             decoration: const InputDecoration(
               labelText: 'Platform',
               isDense: true,
             ),
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
+            style: const TextStyle(fontSize: 12, color: Color.fromARGB(221, 255, 251, 251)),
             items: _platforms
                 .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                 .toList(),
@@ -278,8 +278,8 @@ class _AuthenticitySection extends StatelessWidget {
   const _AuthenticitySection({required this.data});
 
   String _formatFollowers(int n) {
-    if (n >= 1_000_000) return '${(n / 1_000_000).toStringAsFixed(1)}M';
-    if (n >= 1_000) return '${(n / 1_000).toStringAsFixed(1)}K';
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
     return '$n';
   }
 
