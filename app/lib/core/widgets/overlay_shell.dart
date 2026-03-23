@@ -6,20 +6,13 @@ import '../../features/background_check/background_check_screen.dart';
 import '../../features/chat_monitor/chat_monitor_screen.dart';
 import '../../features/community/community_screen.dart';
 import '../../features/video_monitor/video_monitor_screen.dart';
-import '../api/api_client.dart';
+import '../models/backend_readiness.dart';
+import '../state/backend_readiness_provider.dart';
 import '../state/shell_navigation.dart';
 import '../theme/app_theme.dart';
 
-class OverlayShell extends ConsumerStatefulWidget {
+class OverlayShell extends ConsumerWidget {
   const OverlayShell({super.key});
-
-  @override
-  ConsumerState<OverlayShell> createState() => _OverlayShellState();
-}
-
-class _OverlayShellState extends ConsumerState<OverlayShell> {
-  bool _backendReachable = false;
-  bool _checkingBackend = true;
 
   static const _screens = [
     ChatMonitorScreen(),
@@ -29,33 +22,19 @@ class _OverlayShellState extends ConsumerState<OverlayShell> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _checkBackend();
-  }
-
-  Future<void> _checkBackend() async {
-    final reachable = await ApiClient.instance.isBackendReachable();
-    if (mounted) {
-      setState(() {
-        _backendReachable = reachable;
-        _checkingBackend = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final selectedTab = ref.watch(shellTabProvider);
     final selectedIndex = ShellTab.values.indexOf(selectedTab);
+    final readiness = ref.watch(backendReadinessProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.surface,
       body: Column(
         children: [
-          _AppHeader(),
-          if (!_checkingBackend && !_backendReachable)
-            _BackendBanner(onRetry: _checkBackend),
+          _AppHeader(
+            readiness: readiness,
+            onRetry: () => ref.invalidate(backendReadinessProvider),
+          ),
           Expanded(child: _screens[selectedIndex]),
         ],
       ),
@@ -90,8 +69,47 @@ class _OverlayShellState extends ConsumerState<OverlayShell> {
 }
 
 class _AppHeader extends StatelessWidget {
+  const _AppHeader({
+    required this.readiness,
+    required this.onRetry,
+  });
+
+  final AsyncValue<BackendReadiness> readiness;
+  final VoidCallback onRetry;
+
   @override
   Widget build(BuildContext context) {
+    final status = switch (readiness) {
+      AsyncData(:final value) when value.isReady => _HeaderStatus(
+          label: 'ONLINE',
+          detail: 'All core services configured',
+          color: const Color(0xFF2E7D32),
+          background: const Color(0xFFDCF4E4),
+          icon: Icons.security_update_good,
+        ),
+      AsyncData(:final value) => _HeaderStatus(
+          label: 'CONFIG NEEDED',
+          detail: value.missingCoreEnv.join(', '),
+          color: const Color(0xFFF57F17),
+          background: const Color(0xFFFFF3E0),
+          icon: Icons.settings_suggest_outlined,
+        ),
+      AsyncError() => const _HeaderStatus(
+          label: 'OFFLINE',
+          detail: 'Start uvicorn main:app --reload',
+          color: AppTheme.error,
+          background: AppTheme.errorContainer,
+          icon: Icons.cloud_off,
+        ),
+      _ => const _HeaderStatus(
+          label: 'CHECKING',
+          detail: 'Verifying backend readiness',
+          color: AppTheme.primaryContainer,
+          background: Color(0xFFE8EAF6),
+          icon: Icons.sync,
+        ),
+    };
+
     return Container(
       height: 52,
       decoration: const BoxDecoration(gradient: AppTheme.gradient),
@@ -111,19 +129,32 @@ class _AppHeader extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'AI SHIELD',
-              style: GoogleFonts.inter(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-                letterSpacing: 1,
+          Tooltip(
+            message: status.detail,
+            child: GestureDetector(
+              onTap: onRetry,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: status.background,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Icon(status.icon, size: 12, color: status.color),
+                    const SizedBox(width: 4),
+                    Text(
+                      status.label,
+                      style: GoogleFonts.inter(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: status.color,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -133,33 +164,18 @@ class _AppHeader extends StatelessWidget {
   }
 }
 
-class _BackendBanner extends StatelessWidget {
-  final VoidCallback onRetry;
-  const _BackendBanner({required this.onRetry});
+class _HeaderStatus {
+  final String label;
+  final String detail;
+  final Color color;
+  final Color background;
+  final IconData icon;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFFFF3E0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          const Icon(Icons.warning_amber_rounded,
-              size: 13, color: Color(0xFFF57F17)),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'Backend not running — start uvicorn first',
-              style: AppTheme.label(10, color: const Color(0xFF7B4700)),
-            ),
-          ),
-          GestureDetector(
-            onTap: onRetry,
-            child: Text('Retry',
-                style: AppTheme.label(10, color: AppTheme.primaryContainer)),
-          ),
-        ],
-      ),
-    );
-  }
+  const _HeaderStatus({
+    required this.label,
+    required this.detail,
+    required this.color,
+    required this.background,
+    required this.icon,
+  });
 }

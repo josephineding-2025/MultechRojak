@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../models/backend_readiness.dart';
+
 class ApiClient {
   ApiClient._();
 
@@ -19,11 +21,23 @@ class ApiClient {
 
   Dio get dio => _dio;
 
-  /// Returns true if the backend is running and healthy.
+  Future<BackendReadiness> fetchBackendReadiness() async {
+    final response = await _dio.get('/health');
+    final data = response.data;
+    if (data is! Map<String, dynamic>) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        error: 'Invalid health response format',
+      );
+    }
+    return BackendReadiness.fromJson(data);
+  }
+
   Future<bool> isBackendReachable() async {
     try {
-      final response = await _dio.get('/health');
-      return response.statusCode == 200;
+      final readiness = await fetchBackendReadiness();
+      return readiness.isReachable;
     } catch (_) {
       return false;
     }

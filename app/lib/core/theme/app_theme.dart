@@ -30,12 +30,12 @@ class AppTheme {
   static final ambientShadow = BoxShadow(
     offset: const Offset(0, 4),
     blurRadius: 16,
-    color: const Color(0xFF1A237E).withOpacity(0.06),
+    color: const Color(0xFF1A237E).withValues(alpha: 0.06),
   );
 
   // --- Decorations ---
   static BoxDecoration glassCard({double radius = 12}) => BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
+        color: Colors.white.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(radius),
         boxShadow: [ambientShadow],
       );
@@ -91,6 +91,37 @@ class AppTheme {
     if (score >= 40) return 'Medium Risk';
     return 'High Risk';
   }
+
+  static Color riskLevelColor(String level) {
+    switch (level.toUpperCase()) {
+      case 'CRITICAL':
+        return const Color(0xFF7F1010);
+      case 'HIGH':
+        return error;
+      case 'MEDIUM':
+        return const Color(0xFFF57F17);
+      default:
+        return const Color(0xFF2E7D32);
+    }
+  }
+
+  static Color riskLevelBackground(String level) {
+    switch (level.toUpperCase()) {
+      case 'CRITICAL':
+        return const Color(0xFFF8D7DA);
+      case 'HIGH':
+        return errorContainer;
+      case 'MEDIUM':
+        return const Color(0xFFFFF3E0);
+      default:
+        return const Color(0xFFE8F5E9);
+    }
+  }
+
+  static Color severityColor(String severity) => riskLevelColor(severity);
+
+  static Color severityBackground(String severity) =>
+      riskLevelBackground(severity);
 
   // --- MaterialTheme ---
   static ThemeData get theme => ThemeData(
@@ -160,7 +191,7 @@ class AppTheme {
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: surfaceLowest,
-          indicatorColor: primaryContainer.withOpacity(0.12),
+          indicatorColor: primaryContainer.withValues(alpha: 0.12),
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
             final selected = states.contains(WidgetState.selected);
             return GoogleFonts.inter(

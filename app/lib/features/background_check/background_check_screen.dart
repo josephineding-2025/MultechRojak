@@ -7,6 +7,7 @@ import '../../core/models/app_state.dart';
 import '../../core/models/background_check_result.dart';
 import '../../core/models/community_flag.dart';
 import '../../core/models/requests.dart';
+import '../../core/state/backend_readiness_provider.dart';
 import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
 import '../community/community_provider.dart';
@@ -57,6 +58,9 @@ class _BackgroundCheckScreenState
   }
 
   void _onSubmit() {
+    if (!_canRunBackgroundCheck()) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     final url = _urlController.text.trim();
     final username = _usernameController.text.trim();
@@ -98,6 +102,7 @@ class _BackgroundCheckScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(backendReadinessProvider);
     // ── URL/SSE streaming path ─────────────────────────────────────────────
     if (_streamParams != null) {
       final stream = ref.watch(backgroundCheckStreamProvider(_streamParams!));
@@ -145,9 +150,35 @@ class _BackgroundCheckScreenState
     );
   }
 
+  bool _canRunBackgroundCheck() {
+    final readiness = ref.read(backendReadinessProvider).valueOrNull;
+    return readiness?.capabilityEnabled('background_check') ?? true;
+  }
+
+  String _backgroundCheckCapabilityMessage() {
+    final readiness = ref.read(backendReadinessProvider).valueOrNull;
+    if (readiness == null) {
+      return 'Background check is waiting for backend readiness.';
+    }
+    if (!readiness.isReachable) {
+      return 'Start the backend first to run profile checks.';
+    }
+    final missing = readiness.missingCoreEnv.where(
+      (name) =>
+          name == 'OPENROUTER_API_KEY' ||
+          name == 'SERPAPI_KEY' ||
+          name == 'NUMVERIFY_API_KEY',
+    );
+    if (missing.isEmpty) {
+      return 'Background check is not ready yet.';
+    }
+    return 'Background check needs ${missing.join(', ')} configured.';
+  }
+
   // ── Form ──────────────────────────────────────────────────────────────────
 
   Widget _buildForm() {
+    final canRunBackgroundCheck = _canRunBackgroundCheck();
     return Form(
       key: _formKey,
       child: Column(
@@ -247,7 +278,16 @@ class _BackgroundCheckScreenState
             label: 'Run Background Check',
             icon: Icons.search,
             onPressed: _onSubmit,
+            enabled: canRunBackgroundCheck,
           ),
+          if (!canRunBackgroundCheck) ...[
+            const SizedBox(height: 8),
+            Text(
+              _backgroundCheckCapabilityMessage(),
+              style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ],
       ),
     );
@@ -563,26 +603,42 @@ class _GradientButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
+  final bool enabled;
   const _GradientButton(
-      {required this.label, required this.icon, required this.onPressed});
+      {required this.label,
+      required this.icon,
+      required this.onPressed,
+      this.enabled = true});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onPressed,
+      onTap: enabled ? onPressed : null,
       child: Container(
         height: 46,
-        decoration: AppTheme.gradientBox(radius: 12),
+        decoration: enabled
+            ? AppTheme.gradientBox(radius: 12)
+            : BoxDecoration(
+                color: AppTheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 16),
+            Icon(
+              icon,
+              color: enabled ? Colors.white : AppTheme.onSurfaceVariant,
+              size: 16,
+            ),
             const SizedBox(width: 8),
-            Text(label,
-                style: GoogleFonts.manrope(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
+            Text(
+              label,
+              style: GoogleFonts.manrope(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: enabled ? Colors.white : AppTheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),

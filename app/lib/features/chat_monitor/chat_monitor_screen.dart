@@ -9,6 +9,7 @@ import '../../core/api/api_error.dart';
 import '../../core/models/app_state.dart';
 import '../../core/models/requests.dart';
 import '../../core/models/risk_report.dart';
+import '../../core/state/backend_readiness_provider.dart';
 import '../../core/state/shell_navigation.dart';
 import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
@@ -48,6 +49,14 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   }
 
   Future<void> _startScan() async {
+    if (!_canUseChatAnalysis()) {
+      setState(() {
+        _errorMessage = _chatCapabilityMessage();
+        _state = _ScanState.error;
+      });
+      return;
+    }
+
     final hasAccess = await _captureController.ensureCaptureAccess();
     if (!hasAccess) {
       setState(() {
@@ -98,6 +107,14 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   }
 
   Future<void> _analyze() async {
+    if (!_canUseChatAnalysis()) {
+      setState(() {
+        _errorMessage = _chatCapabilityMessage();
+        _state = _ScanState.error;
+      });
+      return;
+    }
+
     _captureTimer?.cancel();
     if (_frames.isEmpty) {
       setState(() {
@@ -176,6 +193,7 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(backendReadinessProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: switch (_state) {
@@ -188,9 +206,26 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
     );
   }
 
+  bool _canUseChatAnalysis() {
+    final readiness = ref.read(backendReadinessProvider).valueOrNull;
+    return readiness?.capabilityEnabled('chat_analysis') ?? true;
+  }
+
+  String _chatCapabilityMessage() {
+    final readiness = ref.read(backendReadinessProvider).valueOrNull;
+    if (readiness == null) {
+      return 'Chat analysis is not ready yet. Retry after the backend status finishes loading.';
+    }
+    if (!readiness.isReachable) {
+      return 'Start the backend first to analyze chat screenshots.';
+    }
+    return 'Chat analysis is unavailable until OPENROUTER_API_KEY is configured.';
+  }
+
   // ── Idle ────────────────────────────────────────────────────────────────
 
   Widget _buildIdle() {
+    final canUseChat = _canUseChatAnalysis();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -230,7 +265,16 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
           label: 'Start Scan',
           icon: Icons.radar,
           onPressed: _startScan,
+          enabled: canUseChat,
         ),
+        if (!canUseChat) ...[
+          const SizedBox(height: 8),
+          Text(
+            _chatCapabilityMessage(),
+            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 20),
         Text('HOW IT WORKS',
             style: AppTheme.label(9, color: AppTheme.onSurfaceVariant)),
@@ -255,6 +299,7 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   // ── Scanning ─────────────────────────────────────────────────────────────
 
   Widget _buildScanning() {
+    final canUseChat = _canUseChatAnalysis();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -291,6 +336,7 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
           label: 'Analyze',
           icon: Icons.auto_fix_high,
           onPressed: _analyze,
+          enabled: canUseChat,
         ),
       ],
     );
@@ -314,8 +360,8 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   // ── Report ───────────────────────────────────────────────────────────────
 
   Widget _buildReport(RiskReport report) {
-    final color = _riskColor(report.riskLevel);
-    final bg = _riskBg(report.riskLevel);
+    final color = AppTheme.riskLevelColor(report.riskLevel);
+    final bg = AppTheme.riskLevelBackground(report.riskLevel);
     final canFlagProfile = isRiskLevelEligibleForCommunity(report.riskLevel);
 
     return Column(
@@ -478,32 +524,6 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   }
 }
 
-// ── Risk helpers ──────────────────────────────────────────────────────────────
-
-Color _riskColor(String level) {
-  switch (level.toUpperCase()) {
-    case 'HIGH':
-    case 'CRITICAL':
-      return AppTheme.error;
-    case 'MEDIUM':
-      return const Color(0xFFF57F17);
-    default:
-      return const Color(0xFF2E7D32);
-  }
-}
-
-Color _riskBg(String level) {
-  switch (level.toUpperCase()) {
-    case 'HIGH':
-    case 'CRITICAL':
-      return AppTheme.errorContainer;
-    case 'MEDIUM':
-      return const Color(0xFFFFF8E1);
-    default:
-      return const Color(0xFFE8F5E9);
-  }
-}
-
 // ── Shared sub-widgets ────────────────────────────────────────────────────────
 
 class _GradientButton extends StatelessWidget {
@@ -620,12 +640,8 @@ class _RedFlagCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final severityColor = flag.severity == 'critical' || flag.severity == 'high'
-        ? AppTheme.error
-        : const Color(0xFFF57F17);
-    final severityBg = flag.severity == 'critical' || flag.severity == 'high'
-        ? AppTheme.errorContainer
-        : const Color(0xFFFFF8E1);
+    final severityColor = AppTheme.severityColor(flag.severity);
+    final severityBg = AppTheme.severityBackground(flag.severity);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),

@@ -7,6 +7,7 @@ import '../../core/api/api_error.dart';
 import '../../core/models/app_state.dart';
 import '../../core/models/community_flag.dart';
 import '../../core/models/requests.dart';
+import '../../core/state/backend_readiness_provider.dart';
 import '../../core/state/shell_navigation.dart';
 import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
@@ -205,6 +206,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   }
 
   void _runCheck() {
+    if (!_canUseCommunity()) {
+      return;
+    }
     final q = _checkController.text.trim();
     if (q.isEmpty) {
       return;
@@ -241,6 +245,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   }
 
   void _submitFlag() {
+    if (!_canUseCommunity()) {
+      return;
+    }
     if (!_canAccessFlagTab || _eligibility == null) {
       return;
     }
@@ -331,9 +338,31 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   bool get _hasSelectedFlags => _selectedFlags.isNotEmpty;
 
   bool get _canSubmitFlag =>
-      _canAccessFlagTab && _hasFlagIdentifier && _hasSelectedFlags;
+      _canAccessFlagTab &&
+      _canUseCommunity() &&
+      _hasFlagIdentifier &&
+      _hasSelectedFlags;
+
+  bool _canUseCommunity() {
+    final readiness = ref.read(backendReadinessProvider).valueOrNull;
+    return readiness?.capabilityEnabled('community') ?? true;
+  }
+
+  String _communityCapabilityMessage() {
+    final readiness = ref.read(backendReadinessProvider).valueOrNull;
+    if (readiness == null) {
+      return 'Community checks are waiting for backend readiness.';
+    }
+    if (!readiness.isReachable) {
+      return 'Start the backend first to check or submit community reports.';
+    }
+    return 'Community features need SUPABASE_URL and SUPABASE_ANON_KEY configured.';
+  }
 
   String? get _flagValidationMessage {
+    if (!_canUseCommunity()) {
+      return _communityCapabilityMessage();
+    }
     if (!_hasFlagIdentifier && !_hasSelectedFlags) {
       return 'Enter a handle/phone or use a saved photo hash, then select at least one flag type.';
     }
@@ -348,6 +377,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(backendReadinessProvider);
     final launchIntent = ref.watch(communityLaunchIntentProvider);
     if (launchIntent != null &&
         launchIntent.launchId != _lastHandledLaunchId) {
@@ -445,6 +475,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   }
 
   Widget _buildCheckTab() {
+    final canUseCommunity = _canUseCommunity();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -468,18 +499,25 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             ),
             const SizedBox(width: 8),
             GestureDetector(
-              onTap: _runCheck,
+              onTap: canUseCommunity ? _runCheck : null,
               child: Container(
                 height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: AppTheme.gradientBox(radius: 12),
+                decoration: canUseCommunity
+                    ? AppTheme.gradientBox(radius: 12)
+                    : BoxDecoration(
+                        color: AppTheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                 child: Center(
                   child: Text(
                     'Check',
                     style: GoogleFonts.manrope(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: canUseCommunity
+                          ? Colors.white
+                          : AppTheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -487,6 +525,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             ),
           ],
         ),
+        if (!canUseCommunity) ...[
+          const SizedBox(height: 8),
+          Text(
+            _communityCapabilityMessage(),
+            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 10),
         if (_checkParams != null) _CheckResult(params: _checkParams!),
       ],

@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/api/api_error.dart';
 import '../../core/models/requests.dart';
 import '../../core/models/video_alert.dart';
+import '../../core/state/backend_readiness_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../chat_monitor/chat_capture_controller.dart';
 import 'video_monitor_provider.dart';
@@ -23,6 +24,7 @@ class VideoMonitorScreen extends ConsumerStatefulWidget {
 
 class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
   static const _visualScanInterval = Duration(seconds: 5);
+  static const _stickyAlertDuration = Duration(seconds: 10);
 
   final List<_AlertEntry> _alerts = [];
   final _captureController = ChatCaptureController();
@@ -30,6 +32,8 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
   _MonitorState _state = _MonitorState.idle;
   Timer? _sessionTimer;
   Timer? _visualCaptureTimer;
+  Timer? _stickyAlertTimer;
+  _AlertEntry? _stickyAlert;
   int _seconds = 0;
   String _statusMessage = 'Visual monitoring ready.';
   String? _errorMessage;
@@ -39,10 +43,19 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
   void dispose() {
     _sessionTimer?.cancel();
     _visualCaptureTimer?.cancel();
+    _stickyAlertTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _startMonitoring() async {
+    if (!_canUseVideoMonitoring()) {
+      setState(() {
+        _errorMessage = _videoCapabilityMessage();
+        _state = _MonitorState.summary;
+      });
+      return;
+    }
+
     final hasAccess = await _captureController.ensureCaptureAccess();
     if (!hasAccess) {
       setState(() {
@@ -55,6 +68,8 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
 
     _sessionTimer?.cancel();
     _visualCaptureTimer?.cancel();
+    _stickyAlertTimer?.cancel();
+    _stickyAlert = null;
     _sessionId = 'video_${DateTime.now().millisecondsSinceEpoch}';
     _captureController.reset();
     setState(() {
@@ -101,7 +116,9 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
               ? 'Suspicious visual pattern detected.'
               : 'No suspicious visual pattern detected in the latest scan.';
           if (alert.alert) {
-            _alerts.insert(0, _AlertEntry.video(alert));
+            final entry = _AlertEntry.video(alert);
+            _alerts.insert(0, entry);
+            _showStickyAlert(entry);
           }
         });
       } catch (error) {
@@ -122,17 +139,44 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
     });
   }
 
+  void _showStickyAlert(_AlertEntry entry) {
+    _stickyAlertTimer?.cancel();
+    _stickyAlert = entry;
+    _stickyAlertTimer = Timer(_stickyAlertDuration, () {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _stickyAlert = null);
+    });
+  }
+
+  void _dismissStickyAlert() {
+    _stickyAlertTimer?.cancel();
+    setState(() => _stickyAlert = null);
+  }
+
+  void _openStickyAlertDetails() {
+    _dismissStickyAlert();
+    _stopMonitoring();
+  }
+
   void _stopMonitoring() {
     _sessionTimer?.cancel();
     _visualCaptureTimer?.cancel();
-    setState(() => _state = _MonitorState.summary);
+    _stickyAlertTimer?.cancel();
+    setState(() {
+      _stickyAlert = null;
+      _state = _MonitorState.summary;
+    });
   }
 
   void _reset() {
     _sessionTimer?.cancel();
     _visualCaptureTimer?.cancel();
+    _stickyAlertTimer?.cancel();
     setState(() {
       _alerts.clear();
+      _stickyAlert = null;
       _seconds = 0;
       _errorMessage = null;
       _statusMessage = 'Visual monitoring ready.';
@@ -140,19 +184,52 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
     });
   }
 
+  bool _canUseVideoMonitoring() {
+    final readiness = ref.read(backendReadinessProvider).valueOrNull;
+    return readiness?.capabilityEnabled('video_frame_analysis') ?? true;
+  }
+
+  String _videoCapabilityMessage() {
+    final readiness = ref.read(backendReadinessProvider).valueOrNull;
+    if (readiness == null) {
+      return 'Video monitoring is waiting for backend readiness.';
+    }
+    if (!readiness.isReachable) {
+      return 'Start the backend first to monitor video calls.';
+    }
+    return 'Video monitoring is unavailable until OPENROUTER_API_KEY is configured.';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: switch (_state) {
-        _MonitorState.idle => _buildIdle(),
-        _MonitorState.active => _buildActive(),
-        _MonitorState.summary => _buildSummary(),
-      },
+    ref.watch(backendReadinessProvider);
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: switch (_state) {
+            _MonitorState.idle => _buildIdle(),
+            _MonitorState.active => _buildActive(),
+            _MonitorState.summary => _buildSummary(),
+          },
+        ),
+        if (_stickyAlert != null && _state == _MonitorState.active)
+          Positioned(
+            top: 24,
+            right: 16,
+            left: 16,
+            child: _StickyAlertCard(
+              entry: _stickyAlert!,
+              onDismiss: _dismissStickyAlert,
+              onSeeDetails: _openStickyAlertDetails,
+            ),
+          ),
+      ],
     );
   }
 
   Widget _buildIdle() {
+    final canUseVideoMonitoring = _canUseVideoMonitoring();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -176,7 +253,16 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
           label: 'Start Monitoring',
           icon: Icons.shield_outlined,
           onPressed: _startMonitoring,
+          enabled: canUseVideoMonitoring,
         ),
+        if (!canUseVideoMonitoring) ...[
+          const SizedBox(height: 8),
+          Text(
+            _videoCapabilityMessage(),
+            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 20),
         Text(
           'DETECTION CAPABILITIES',
@@ -282,15 +368,29 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
           ..._alerts.map((entry) => _AlertCard(entry: entry)),
         ],
         const SizedBox(height: 16),
-        OutlinedButton(
+        FilledButton.icon(
           onPressed: _stopMonitoring,
-          child: const Text('Stop Monitoring'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.error,
+            foregroundColor: Colors.white,
+          ),
+          icon: const Icon(Icons.stop_circle_outlined, size: 18),
+          label: const Text('Stop Monitoring'),
         ),
       ],
     );
   }
 
   Widget _buildSummary() {
+    final highestSeverity = _alerts.isEmpty
+        ? 'LOW'
+        : _alerts
+            .map((entry) => entry.severity)
+            .reduce(_maxSeverity);
+    final summaryColor = _alerts.isEmpty
+        ? AppTheme.riskLevelColor('LOW')
+        : AppTheme.severityColor(highestSeverity);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -330,9 +430,7 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
                 style: GoogleFonts.manrope(
                   fontSize: 36,
                   fontWeight: FontWeight.w800,
-                  color: _alerts.isEmpty
-                      ? const Color(0xFF2E7D32)
-                      : AppTheme.error,
+                  color: summaryColor,
                 ),
               ),
               const SizedBox(width: 10),
@@ -358,6 +456,18 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
         ),
       ],
     );
+  }
+
+  String _maxSeverity(String left, String right) {
+    const rank = {
+      'CRITICAL': 4,
+      'HIGH': 3,
+      'MEDIUM': 2,
+      'LOW': 1,
+    };
+    final leftScore = rank[left.toUpperCase()] ?? 0;
+    final rightScore = rank[right.toUpperCase()] ?? 0;
+    return leftScore >= rightScore ? left : right;
   }
 
   String _formatTime(int seconds) {
@@ -387,30 +497,41 @@ class _GradientButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onPressed,
+    this.enabled = true,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onPressed,
+      onTap: enabled ? onPressed : null,
       child: Container(
         height: 46,
-        decoration: AppTheme.gradientBox(radius: 12),
+        decoration: enabled
+            ? AppTheme.gradientBox(radius: 12)
+            : BoxDecoration(
+                color: AppTheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 16),
+            Icon(
+              icon,
+              color: enabled ? Colors.white : AppTheme.onSurfaceVariant,
+              size: 16,
+            ),
             const SizedBox(width: 8),
             Text(
               label,
               style: GoogleFonts.manrope(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: enabled ? Colors.white : AppTheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -467,11 +588,8 @@ class _AlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isHigh =
-        entry.severity == 'critical' || entry.severity == 'high';
-    final background =
-        isHigh ? AppTheme.errorContainer : const Color(0xFFFFF8E1);
-    final color = isHigh ? AppTheme.error : const Color(0xFFF57F17);
+    final background = AppTheme.severityBackground(entry.severity);
+    final color = AppTheme.severityColor(entry.severity);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -499,6 +617,88 @@ class _AlertCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StickyAlertCard extends StatelessWidget {
+  const _StickyAlertCard({
+    required this.entry,
+    required this.onDismiss,
+    required this.onSeeDetails,
+  });
+
+  final _AlertEntry entry;
+  final VoidCallback onDismiss;
+  final VoidCallback onSeeDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = AppTheme.severityBackground(entry.severity);
+    final color = AppTheme.severityColor(entry.severity);
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 18, color: color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Red Flag Detected',
+                    style: AppTheme.headline(12, color: color),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onDismiss,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.close, size: 18, color: color),
+                ),
+              ],
+            ),
+            Text(
+              entry.reason,
+              style: AppTheme.body(11, color: AppTheme.onSurface),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: onDismiss,
+                  child: const Text('Dismiss'),
+                ),
+                const SizedBox(width: 6),
+                FilledButton(
+                  onPressed: onSeeDetails,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(96, 36),
+                  ),
+                  child: const Text('See Details'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
