@@ -35,7 +35,7 @@ void main() {
             ),
           ),
         ],
-        child: FakeLoveApp(),
+        child: const FakeLoveApp(),
       ),
     );
 

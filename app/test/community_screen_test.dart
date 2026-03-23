@@ -35,6 +35,7 @@ void main() {
       findsOneWidget,
     );
 
+    await tester.ensureVisible(find.text('Flag Scammer'));
     await tester.tap(find.text('Flag Scammer'));
     await tester.pumpAndSettle();
 
@@ -57,6 +58,7 @@ void main() {
 
     await pumpCommunityScreen(tester);
 
+    await tester.ensureVisible(find.text('Flag Scammer'));
     await tester.tap(find.text('Flag Scammer'));
     await tester.pumpAndSettle();
 

@@ -1,7 +1,5 @@
-// Owner: Member 3
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/api/api_error.dart';
 import '../../core/models/app_state.dart';
@@ -11,6 +9,7 @@ import '../../core/state/backend_readiness_provider.dart';
 import '../../core/state/shell_navigation.dart';
 import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/editorial_ui.dart';
 import 'community_provider.dart';
 
 enum _CommunityTab { check, flag }
@@ -234,8 +233,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       ),
     );
 
-    final displayValue =
-        lookup.handle ?? lookup.phone ?? lookup.photoHash ?? _checkController.text.trim();
+    final displayValue = lookup.handle ??
+        lookup.phone ??
+        lookup.photoHash ??
+        _checkController.text.trim();
 
     setState(() {
       _selectedTab = _CommunityTab.check;
@@ -379,68 +380,156 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   Widget build(BuildContext context) {
     ref.watch(backendReadinessProvider);
     final launchIntent = ref.watch(communityLaunchIntentProvider);
-    if (launchIntent != null &&
-        launchIntent.launchId != _lastHandledLaunchId) {
+    if (launchIntent != null && launchIntent.launchId != _lastHandledLaunchId) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _registerLaunchIntent(launchIntent),
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    return EditorialPage(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(
-                Icons.group_outlined,
-                size: 18,
-                color: AppTheme.primaryContainer,
-              ),
-              const SizedBox(width: 8),
-              Text('Community Circle', style: AppTheme.headline(15)),
-            ],
+          const EditorialEyebrow(
+            label: 'ASEAN NETWORK',
+            icon: Icons.public,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 18),
           Text(
-            'Check if a profile has been reported, or flag a confirmed scammer.',
-            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+            'Regional\nScam Shield',
+            style: AppTheme.headline(
+              42,
+              color: AppTheme.primary,
+              weight: FontWeight.w800,
+              height: 0.94,
+            ),
           ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: AppTheme.tonalSection(),
-            child: Row(
+          const SizedBox(height: 12),
+          Text(
+            'A feed-first community surface for profile lookups, flags, and cross-border scam intelligence. The feed cards are mock-first; the lookup and reporting tools are live.',
+            style: AppTheme.body(
+              14,
+              color: AppTheme.onSurfaceVariant,
+              height: 1.55,
+            ),
+          ),
+          const SizedBox(height: 18),
+          SurfacePanel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Community contribution',
-                        style: AppTheme.headline(11),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Turn this off to keep your future scan results local only.',
-                        style: AppTheme.body(
-                          10,
-                          color: AppTheme.onSurfaceVariant,
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _checkController,
+                        decoration: const InputDecoration(
+                          hintText: 'Search handles or phone numbers...',
+                          prefixIcon: Icon(Icons.search),
                         ),
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 10),
+                    TonalPanel(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 16,
+                      ),
+                      radius: 20,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.filter_list,
+                            size: 18,
+                            color: AppTheme.onSurface,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Filters',
+                            style: AppTheme.headline(13, weight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TonalPanel(
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.volunteer_activism_outlined,
+                              size: 18,
+                              color: AppTheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Community contribution',
+                                style: AppTheme.headline(
+                                  15,
+                                  weight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Switch(
+                              value: _settings.communityContributionEnabled,
+                              onChanged: _toggleContribution,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!_canUseCommunity()) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _communityCapabilityMessage(),
+                    style: AppTheme.body(
+                      12,
+                      color: AppTheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-                Switch(
-                  value: _settings.communityContributionEnabled,
-                  onChanged: _toggleContribution,
-                ),
+                ],
               ],
             ),
           ),
           const SizedBox(height: 20),
+          const EditorialSectionTitle(
+            title: 'Regional intelligence feed',
+            subtitle: 'Mock-first presentation for the Stitch community cards.',
+            trailing: MockTag(label: 'Feed mock'),
+          ),
+          const SizedBox(height: 14),
+          const _MockFeedCard(
+            handle: '@crypto_lover_99',
+            region: 'Malaysia',
+            status: 'Flagged',
+            summary:
+                'Promising 300% returns on “gold-linked” digital assets in private WhatsApp groups.',
+          ),
+          const SizedBox(height: 12),
+          const _MockFeedCard(
+            handle: '@bank_secure_fix',
+            region: 'Indonesia',
+            status: 'Confirmed',
+            summary:
+                'Verified malicious banking impersonation campaign with phishing links in the bio.',
+          ),
+          const SizedBox(height: 12),
+          const _MockThreatCard(),
+          const SizedBox(height: 22),
+          const EditorialSectionTitle(
+            title: 'Community tools',
+            subtitle:
+                'Real lookup and reporting flows inside the new feed-first surface.',
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -450,7 +539,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                   onTap: () => _selectTab(_CommunityTab.check),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: _CommunityTabButton(
                   label: 'Flag Scammer',
@@ -461,14 +550,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (!_loadingState && !_canAccessFlagTab)
+          if (!_loadingState && !_canAccessFlagTab) ...[
+            const SizedBox(height: 12),
             _InlineNotice(message: _flagLockMessage),
-          if (!_loadingState && !_canAccessFlagTab) const SizedBox(height: 12),
-          if (_selectedTab == _CommunityTab.check)
-            _buildCheckTab()
-          else
-            _buildFlagTab(),
+          ],
+          const SizedBox(height: 14),
+          SurfacePanel(
+            child: _selectedTab == _CommunityTab.check
+                ? _buildCheckTab()
+                : _buildFlagTab(),
+          ),
         ],
       ),
     );
@@ -477,64 +568,48 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   Widget _buildCheckTab() {
     final canUseCommunity = _canUseCommunity();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'CHECK PROFILE',
-          style: AppTheme.label(9, color: AppTheme.onSurfaceVariant),
+          style: AppTheme.label(11, weight: FontWeight.w800),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
               child: TextField(
                 controller: _checkController,
-                style: AppTheme.body(13),
                 decoration: const InputDecoration(
                   hintText: 'Handle or phone number',
-                  prefixIcon: Icon(Icons.search_outlined, size: 18),
-                  isDense: true,
+                  prefixIcon: Icon(Icons.search_outlined),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: canUseCommunity ? _runCheck : null,
-              child: Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: canUseCommunity
-                    ? AppTheme.gradientBox(radius: 12)
-                    : BoxDecoration(
-                        color: AppTheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                child: Center(
-                  child: Text(
-                    'Check',
-                    style: GoogleFonts.manrope(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: canUseCommunity
-                          ? Colors.white
-                          : AppTheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 132,
+              child: GradientCtaButton(
+                label: 'Check',
+                icon: Icons.arrow_forward,
+                onPressed: _runCheck,
+                enabled: canUseCommunity,
+                compact: true,
               ),
             ),
           ],
         ),
         if (!canUseCommunity) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             _communityCapabilityMessage(),
-            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
-            textAlign: TextAlign.center,
+            style: AppTheme.body(12, color: AppTheme.onSurfaceVariant),
           ),
         ],
-        const SizedBox(height: 10),
-        if (_checkParams != null) _CheckResult(params: _checkParams!),
+        if (_checkParams != null) ...[
+          const SizedBox(height: 16),
+          _CheckResult(params: _checkParams!),
+        ],
       ],
     );
   }
@@ -554,66 +629,67 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'FLAG SCAMMER',
-          style: AppTheme.label(9, color: AppTheme.onSurfaceVariant),
+          style: AppTheme.label(11, weight: FontWeight.w800),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           initialValue: _flagPlatform,
-          style: AppTheme.body(13),
           decoration: const InputDecoration(
             labelText: 'Platform',
-            prefixIcon: Icon(Icons.devices_outlined, size: 18),
+            prefixIcon: Icon(Icons.devices_outlined),
           ),
           items: _platforms
               .map((p) => DropdownMenuItem(value: p, child: Text(p)))
               .toList(),
           onChanged: (v) => setState(() => _flagPlatform = v!),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         TextField(
           controller: _flagHandleController,
-          style: AppTheme.body(13),
           decoration: const InputDecoration(
             labelText: 'Handle / Username',
             hintText: '@john_crypto88',
-            prefixIcon: Icon(Icons.person_outline, size: 18),
+            prefixIcon: Icon(Icons.person_outline),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         TextField(
           controller: _flagPhoneController,
-          style: AppTheme.body(13),
           decoration: const InputDecoration(
-            labelText: 'Phone (optional)',
+            labelText: 'Phone',
             hintText: '+60123456789',
-            prefixIcon: Icon(Icons.phone_outlined, size: 18),
+            prefixIcon: Icon(Icons.phone_outlined),
           ),
           keyboardType: TextInputType.phone,
         ),
         if (_eligibility != null) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: AppTheme.tonalSection(),
+          const SizedBox(height: 12),
+          TonalPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Eligible source', style: AppTheme.headline(11)),
-                const SizedBox(height: 4),
+                Text(
+                  'Eligible source',
+                  style: AppTheme.headline(16, weight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
                 Text(
                   '${_eligibility!.sourceType} · ${_eligibility!.sourceRiskLevel}',
-                  style: AppTheme.body(10, color: AppTheme.onSurfaceVariant),
+                  style: AppTheme.body(
+                    12,
+                    color: AppTheme.onSurfaceVariant,
+                  ),
                 ),
                 if ((_launchPhotoHash ?? _eligibility!.photoHash) != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
-                    'Photo hash match available for submission.',
+                    'Photo hash evidence is available for this report.',
                     style: AppTheme.body(
-                      10,
+                      12,
                       color: AppTheme.onSurfaceVariant,
                     ),
                   ),
@@ -622,36 +698,35 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             ),
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Text(
           'FLAG TYPE',
-          style: AppTheme.label(9, color: AppTheme.onSurfaceVariant),
+          style: AppTheme.label(11, weight: FontWeight.w800),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         Wrap(
-          spacing: 6,
-          runSpacing: 6,
+          spacing: 8,
+          runSpacing: 8,
           children: _flagOptions
               .map(
-                (f) => _ToggleChip(
-                  label: f,
-                  selected: _selectedFlags.contains(f),
+                (flag) => _ToggleChip(
+                  label: flag,
+                  selected: _selectedFlags.contains(flag),
                   onTap: () => setState(
-                    () => _selectedFlags.contains(f)
-                        ? _selectedFlags.remove(f)
-                        : _selectedFlags.add(f),
+                    () => _selectedFlags.contains(flag)
+                        ? _selectedFlags.remove(flag)
+                        : _selectedFlags.add(flag),
                   ),
                 ),
               )
               .toList(),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         DropdownButtonFormField<String>(
           initialValue: _flagRegion,
-          style: AppTheme.body(13),
           decoration: const InputDecoration(
             labelText: 'Region',
-            prefixIcon: Icon(Icons.location_on_outlined, size: 18),
+            prefixIcon: Icon(Icons.location_on_outlined),
           ),
           items: _regions
               .map((r) => DropdownMenuItem(value: r, child: Text(r)))
@@ -659,18 +734,17 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           onChanged: (v) => setState(() => _flagRegion = v!),
         ),
         const SizedBox(height: 16),
-        _GradientButton(
+        GradientCtaButton(
           label: 'Submit Report',
           icon: Icons.flag_outlined,
           onPressed: _submitFlag,
           enabled: _canSubmitFlag,
         ),
         if (_flagValidationMessage != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             _flagValidationMessage!,
-            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
-            textAlign: TextAlign.center,
+            style: AppTheme.body(12, color: AppTheme.onSurfaceVariant),
           ),
         ],
       ],
@@ -679,37 +753,41 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
 }
 
 class _CheckResult extends ConsumerWidget {
-  final CommunityProfileLookupDto params;
   const _CheckResult({required this.params});
+
+  final CommunityProfileLookupDto params;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(profileCheckProvider(params));
     return async.when(
-      loading: () =>
-          const LinearProgressIndicator(color: AppTheme.primaryContainer),
+      loading: () => const LinearProgressIndicator(
+        color: AppTheme.primaryContainer,
+        minHeight: 5,
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
       error: (error, _) => Text(
         formatApiError(error, fallbackMessage: 'Check failed.'),
-        style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+        style: AppTheme.body(12, color: AppTheme.onSurfaceVariant),
       ),
       data: (result) => result.flagged
-          ? _FlaggedCard(result: result)
-          : Container(
-              padding: const EdgeInsets.all(12),
-              decoration: AppTheme.tonalSection(),
+          ? _FlaggedCard(result: result, params: params)
+          : const TonalPanel(
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.check_circle_outline,
-                    size: 14,
-                    color: Color(0xFF2E7D32),
+                    size: 18,
+                    color: AppTheme.success,
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'No reports found for this profile.',
-                    style: AppTheme.body(
-                      11,
-                      color: const Color(0xFF2E7D32),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No reports found for this profile.',
+                      style: TextStyle(
+                        color: AppTheme.success,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -720,110 +798,200 @@ class _CheckResult extends ConsumerWidget {
 }
 
 class _FlaggedCard extends StatelessWidget {
+  const _FlaggedCard({
+    required this.result,
+    required this.params,
+  });
+
   final ProfileCheckResult result;
-  const _FlaggedCard({required this.result});
+  final CommunityProfileLookupDto params;
 
   @override
   Widget build(BuildContext context) {
-    final tierColor = result.status == 'confirmed'
-        ? AppTheme.error
-        : result.status == 'flagged'
-            ? const Color(0xFFF57F17)
-            : const Color(0xFFF9A825);
-    final tierBg = result.status == 'confirmed'
-        ? AppTheme.errorContainer
-        : result.status == 'flagged'
-            ? const Color(0xFFFFF3E0)
-            : const Color(0xFFFFFDE7);
-    final tierLabel = result.status == 'confirmed'
-        ? '🔴 CONFIRMED SCAMMER'
-        : result.status == 'flagged'
-            ? '🟠 FLAGGED BY COMMUNITY'
-            : '🟡 REPORTED BY USERS';
+    final status = (result.status ?? 'reported').toUpperCase();
+    final color = AppTheme.severityColor(status);
+    final background = AppTheme.severityBackground(status);
+    final handle = params.handle ?? params.phone ?? 'unknown_profile';
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: tierBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(tierLabel, style: AppTheme.label(10, color: tierColor)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TonalPanel(
+          color: background,
+          child: Row(
             children: [
-              _Chip(
-                label:
-                    '${result.reportCount ?? 0} report${(result.reportCount ?? 0) == 1 ? "" : "s"}',
-                color: tierColor,
-                bg: tierBg,
-              ),
-              if (result.region != null)
-                _Chip(
-                  label: result.region!,
-                  color: AppTheme.onSurfaceVariant,
-                  bg: AppTheme.surfaceContainer,
+              Icon(Icons.warning_amber_rounded, color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Flagged profile detected in the community database.',
+                  style: AppTheme.headline(
+                    15,
+                    color: color,
+                    weight: FontWeight.w800,
+                  ),
                 ),
+              ),
             ],
           ),
-          if (result.firstReported != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'First reported: ${result.firstReported}',
-              style: AppTheme.label(10),
-            ),
-          ],
-          if (result.commonFlags != null && result.commonFlags!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: result.commonFlags!
-                  .map(
-                    (f) => _Chip(
-                      label: f,
-                      color: AppTheme.error,
-                      bg: AppTheme.errorContainer,
+        ),
+        const SizedBox(height: 12),
+        GlassPanel(
+          radius: 28,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 92,
+                    height: 92,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(24),
                     ),
-                  )
-                  .toList(),
-            ),
-          ],
-        ],
-      ),
+                    child: const Icon(
+                      Icons.person_off_outlined,
+                      size: 38,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RiskBadge(label: status, color: color, background: background),
+                        const SizedBox(height: 12),
+                        Text(
+                          handle.startsWith('@') ? handle : '@$handle',
+                          style: AppTheme.headline(
+                            26,
+                            color: AppTheme.primary,
+                            weight: FontWeight.w800,
+                          ),
+                        ),
+                        if (result.region != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            result.region!,
+                            style: AppTheme.label(10, weight: FontWeight.w700),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TonalPanel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Report Metrics',
+                            style: AppTheme.label(10, weight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '${result.reportCount ?? 0}',
+                            style: AppTheme.headline(
+                              34,
+                              color: AppTheme.primary,
+                              weight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'Total reports',
+                            style: AppTheme.body(
+                              12,
+                              color: AppTheme.onSurfaceVariant,
+                            ),
+                          ),
+                          if (result.firstReported != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'First reported ${result.firstReported}',
+                              style: AppTheme.body(
+                                11,
+                                color: AppTheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TonalPanel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Identified Patterns',
+                            style: AppTheme.label(10, weight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 10),
+                          if (result.commonFlags != null &&
+                              result.commonFlags!.isNotEmpty)
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: result.commonFlags!
+                                  .map((flag) => _InfoChip(label: flag))
+                                  .toList(),
+                            )
+                          else
+                            Text(
+                              'No pattern metadata attached.',
+                              style: AppTheme.body(
+                                12,
+                                color: AppTheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _FlagResult extends ConsumerWidget {
-  final CommunityFlagRequestDto params;
-  final VoidCallback onCheckProfile;
-
   const _FlagResult({
     required this.params,
     required this.onCheckProfile,
   });
 
+  final CommunityFlagRequestDto params;
+  final VoidCallback onCheckProfile;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(flagScammerProvider(params));
     return async.when(
-      loading: () =>
-          const LinearProgressIndicator(color: AppTheme.primaryContainer),
+      loading: () => const LinearProgressIndicator(
+        color: AppTheme.primaryContainer,
+        minHeight: 5,
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
       error: (error, _) => Text(
         formatApiError(error, fallbackMessage: 'Submission failed.'),
-        style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+        style: AppTheme.body(12, color: AppTheme.onSurfaceVariant),
       ),
-      data: (result) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE8F5E9),
-          borderRadius: BorderRadius.circular(10),
-        ),
+      data: (result) => TonalPanel(
+        color: AppTheme.successContainer,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -831,25 +999,26 @@ class _FlagResult extends ConsumerWidget {
               children: [
                 const Icon(
                   Icons.check_circle,
-                  size: 16,
-                  color: Color(0xFF2E7D32),
+                  color: AppTheme.success,
+                  size: 18,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 10),
                 Text(
                   'Report submitted',
                   style: AppTheme.headline(
-                    12,
-                    color: const Color(0xFF2E7D32),
+                    16,
+                    color: AppTheme.success,
+                    weight: FontWeight.w800,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
             Text(
               'Profile status: ${result.profileStatus} · ${result.totalReports} total reports',
-              style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+              style: AppTheme.body(12, color: AppTheme.onSurfaceVariant),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             OutlinedButton(
               onPressed: onCheckProfile,
               child: const Text('Check This Profile'),
@@ -862,11 +1031,6 @@ class _FlagResult extends ConsumerWidget {
 }
 
 class _CommunityTabButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
   const _CommunityTabButton({
     required this.label,
     required this.selected,
@@ -874,13 +1038,18 @@ class _CommunityTabButton extends StatelessWidget {
     this.enabled = true,
   });
 
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     final background = !enabled
         ? AppTheme.surfaceContainer
         : selected
-            ? AppTheme.primaryContainer
-            : AppTheme.surface;
+            ? null
+            : AppTheme.surfaceLowest;
     final foreground = !enabled
         ? AppTheme.onSurfaceVariant
         : selected
@@ -890,72 +1059,27 @@ class _CommunityTabButton extends StatelessWidget {
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Container(
-        height: 42,
+        height: 52,
         decoration: BoxDecoration(
+          gradient: selected ? AppTheme.gradient : null,
           color: background,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: selected ? AppTheme.primaryContainer : AppTheme.surfaceContainer,
+            color: selected
+                ? Colors.transparent
+                : AppTheme.outlineVariant.withValues(alpha: 0.25),
           ),
+          boxShadow: selected ? [AppTheme.ambientShadow] : null,
         ),
         child: Center(
           child: Text(
             label,
-            style: GoogleFonts.manrope(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            style: AppTheme.headline(
+              14,
               color: foreground,
+              weight: FontWeight.w800,
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GradientButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-  final bool enabled;
-
-  const _GradientButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-    this.enabled = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onPressed : null,
-      child: Container(
-        height: 46,
-        decoration: enabled
-            ? AppTheme.gradientBox(radius: 12)
-            : BoxDecoration(
-                color: AppTheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: enabled ? Colors.white : AppTheme.onSurfaceVariant,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.manrope(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: enabled ? Colors.white : AppTheme.onSurfaceVariant,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -963,27 +1087,30 @@ class _GradientButton extends StatelessWidget {
 }
 
 class _InlineNotice extends StatelessWidget {
-  final String message;
   const _InlineNotice({required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: AppTheme.tonalSection(),
+    return TonalPanel(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(
             Icons.info_outline,
-            size: 15,
-            color: AppTheme.primaryContainer,
+            size: 18,
+            color: AppTheme.primary,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+              style: AppTheme.body(
+                12,
+                color: AppTheme.onSurfaceVariant,
+                height: 1.5,
+              ),
             ),
           ),
         ],
@@ -993,33 +1120,37 @@ class _InlineNotice extends StatelessWidget {
 }
 
 class _ToggleChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
   const _ToggleChip({
     required this.label,
     required this.selected,
     required this.onTap,
   });
 
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
+    final foreground = selected ? Colors.white : AppTheme.primary;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppTheme.primaryContainer
-              : AppTheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(20),
+          gradient: selected ? AppTheme.gradient : null,
+          color: selected ? null : AppTheme.primaryFixed.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
           label,
           style: AppTheme.label(
             10,
-            color: selected ? Colors.white : AppTheme.onSurfaceVariant,
+            color: foreground,
+            weight: FontWeight.w800,
+            letterSpacing: 1.2,
           ),
         ),
       ),
@@ -1027,26 +1158,127 @@ class _ToggleChip extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final Color bg;
-
-  const _Chip({
-    required this.label,
-    required this.color,
-    required this.bg,
+class _MockFeedCard extends StatelessWidget {
+  const _MockFeedCard({
+    required this.handle,
+    required this.region,
+    required this.status,
+    required this.summary,
   });
+
+  final String handle;
+  final String region;
+  final String status;
+  final String summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final upperStatus = status.toUpperCase();
+    final color = AppTheme.severityColor(upperStatus);
+    final background = AppTheme.severityBackground(upperStatus);
+
+    return SurfacePanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      handle,
+                      style: AppTheme.headline(
+                        20,
+                        color: AppTheme.primary,
+                        weight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      region,
+                      style: AppTheme.body(
+                        12,
+                        color: AppTheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              RiskBadge(label: upperStatus, color: color, background: background),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            summary,
+            style: AppTheme.body(
+              12,
+              color: AppTheme.onSurfaceVariant,
+              height: 1.55,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MockThreatCard extends StatelessWidget {
+  const _MockThreatCard();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
+      width: double.infinity,
+      decoration: AppTheme.gradientBox(radius: 28),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const MockTag(label: 'Weekly mock'),
+          const SizedBox(height: 12),
+          Text(
+            'Weekly ASEAN Threat Assessment',
+            style: AppTheme.headline(
+              24,
+              color: Colors.white,
+              weight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Cross-border crypto romance scams are trending upward this week, with high-pressure money requests and investment coercion leading the report mix.',
+            style: AppTheme.body(
+              13,
+              color: Colors.white.withValues(alpha: 0.82),
+              height: 1.55,
+            ),
+          ),
+        ],
       ),
-      child: Text(label, style: AppTheme.label(10, color: color)),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceLow,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: AppTheme.label(10, weight: FontWeight.w700),
+      ),
     );
   }
 }

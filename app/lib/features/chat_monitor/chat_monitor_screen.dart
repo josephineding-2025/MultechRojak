@@ -1,9 +1,7 @@
-// Owner: Member 2
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/api/api_error.dart';
 import '../../core/models/app_state.dart';
@@ -13,6 +11,7 @@ import '../../core/state/backend_readiness_provider.dart';
 import '../../core/state/shell_navigation.dart';
 import '../../core/storage/local_app_state_store.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/editorial_ui.dart';
 import '../background_check/background_check_utils.dart';
 import 'chat_capture_controller.dart';
 import 'chat_monitor_provider.dart';
@@ -29,7 +28,13 @@ class ChatMonitorScreen extends ConsumerStatefulWidget {
 class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   static const _captureInterval = Duration(milliseconds: 500);
   static const _maxFramesForAnalysis = 24;
-  static const _platforms = ['WhatsApp', 'Telegram', 'Instagram', 'Dating App', 'Other'];
+  static const _platforms = [
+    'WhatsApp',
+    'Telegram',
+    'Instagram',
+    'Dating App',
+    'Other',
+  ];
 
   _ScanState _state = _ScanState.idle;
   int _frameCount = 0;
@@ -194,8 +199,9 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(backendReadinessProvider);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    return EditorialPage(
+      centered: true,
+      maxContentWidth: 540,
       child: switch (_state) {
         _ScanState.idle => _buildIdle(),
         _ScanState.scanning => _buildScanning(),
@@ -222,283 +228,500 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
     return 'Chat analysis is unavailable until OPENROUTER_API_KEY is configured.';
   }
 
-  // ── Idle ────────────────────────────────────────────────────────────────
+  IconData _platformIcon(String platform) {
+    switch (platform) {
+      case 'WhatsApp':
+        return Icons.chat;
+      case 'Telegram':
+        return Icons.send_rounded;
+      case 'Instagram':
+        return Icons.camera_alt_outlined;
+      case 'Dating App':
+        return Icons.favorite_border;
+      default:
+        return Icons.forum_outlined;
+    }
+  }
 
   Widget _buildIdle() {
     final canUseChat = _canUseChatAnalysis();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 4),
-        Row(children: [
-          const Icon(Icons.forum_outlined,
-              size: 18, color: AppTheme.primaryContainer),
-          const SizedBox(width: 8),
-          Text('Chat Monitor', style: AppTheme.headline(15)),
-        ]),
-        const SizedBox(height: 4),
-        Text(
-          'Scroll through a conversation while scanning. Our AI flags romance scam patterns in real time.',
-          style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
+        const EditorialEyebrow(
+          label: 'ACTIVE INTELLIGENCE',
+          icon: Icons.security,
         ),
-        const SizedBox(height: 20),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedPlatform,
-          style: AppTheme.body(13),
-          decoration: const InputDecoration(
-            labelText: 'Platform',
-            prefixIcon: Icon(Icons.chat_bubble_outline, size: 18),
+        const SizedBox(height: 18),
+        Text(
+          'Chat\nMonitor',
+          style: AppTheme.headline(
+            42,
+            weight: FontWeight.w800,
+            color: AppTheme.primary,
+            height: 0.94,
           ),
-          items: _platforms
-              .map((platform) =>
-                  DropdownMenuItem(value: platform, child: Text(platform)))
-              .toList(),
-          onChanged: (value) {
-            if (value == null) {
-              return;
-            }
-            setState(() => _selectedPlatform = value);
-          },
         ),
         const SizedBox(height: 12),
-        _GradientButton(
-          label: 'Start Scan',
-          icon: Icons.radar,
-          onPressed: _startScan,
-          enabled: canUseChat,
-        ),
-        if (!canUseChat) ...[
-          const SizedBox(height: 8),
-          Text(
-            _chatCapabilityMessage(),
-            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
-            textAlign: TextAlign.center,
+        Text(
+          'Open any conversation and scroll naturally while the monitor captures only changed frames in memory. Then generate a risk report from live evidence.',
+          style: AppTheme.body(
+            14,
+            color: AppTheme.onSurfaceVariant,
+            height: 1.55,
           ),
-        ],
-        const SizedBox(height: 20),
-        Text('HOW IT WORKS',
-            style: AppTheme.label(9, color: AppTheme.onSurfaceVariant)),
-        const SizedBox(height: 8),
-        _HowItWorksCard(
-          icon: Icons.visibility_outlined,
-          title: 'Passive capture',
-          body:
-              'Captures 2 frames/second while you scroll. Nothing is stored on disk.',
         ),
-        const SizedBox(height: 8),
-        _HowItWorksCard(
-          icon: Icons.psychology_outlined,
-          title: 'AI risk analysis',
-          body:
-              'Vision LLM scans for money requests, urgency language, identity inconsistencies.',
-        ),
-      ],
-    );
-  }
-
-  // ── Scanning ─────────────────────────────────────────────────────────────
-
-  Widget _buildScanning() {
-    final canUseChat = _canUseChatAnalysis();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
+        const SizedBox(height: 24),
         Container(
-          padding: const EdgeInsets.all(14),
-          decoration: AppTheme.surfaceCard(),
-          child: Row(
+          width: double.infinity,
+          decoration: AppTheme.gradientBox(radius: 32),
+          padding: const EdgeInsets.all(28),
+          child: Column(
             children: [
               Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: AppTheme.error,
+                width: 82,
+                height: 82,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.forum, size: 38, color: Colors.white),
               ),
-              const SizedBox(width: 8),
-              Text('Recording',
-                  style: AppTheme.headline(13, color: AppTheme.error)),
-              const Spacer(),
-              Text('$_frameCount frames',
-                  style: AppTheme.label(10)),
+              const SizedBox(height: 18),
+              Text(
+                'Live Risk Detection',
+                style: AppTheme.headline(
+                  24,
+                  color: Colors.white,
+                  weight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Scroll through a suspicious conversation. The model looks for money requests, urgency, manipulation, and identity inconsistencies.',
+                textAlign: TextAlign.center,
+                style: AppTheme.body(
+                  13,
+                  color: Colors.white.withValues(alpha: 0.84),
+                  height: 1.55,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Choose platform',
+                  style: AppTheme.label(
+                    10,
+                    color: Colors.white.withValues(alpha: 0.78),
+                    weight: FontWeight.w700,
+                    letterSpacing: 1.8,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 10,
+                runSpacing: 10,
+                children: _platforms
+                    .map(
+                      (platform) => _PlatformChoiceChip(
+                        label: platform,
+                        icon: _platformIcon(platform),
+                        selected: _selectedPlatform == platform,
+                        onTap: () => setState(() => _selectedPlatform = platform),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 18),
+              GradientCtaButton(
+                label: 'Start Scan',
+                icon: Icons.arrow_forward,
+                onPressed: _startScan,
+                enabled: canUseChat,
+              ),
+              if (!canUseChat) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _chatCapabilityMessage(),
+                  textAlign: TextAlign.center,
+                  style: AppTheme.body(
+                    11,
+                    color: Colors.white.withValues(alpha: 0.84),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        Text(
-          'Scroll through the conversation now. We only keep changed frames in memory. Press Analyze when done.',
-          style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
-          textAlign: TextAlign.center,
+        const SizedBox(height: 24),
+        const EditorialSectionTitle(
+          title: 'How it works',
+          subtitle: 'A privacy-first monitor that behaves like a premium safety overlay.',
         ),
-        const SizedBox(height: 16),
-        _GradientButton(
-          label: 'Analyze',
-          icon: Icons.auto_fix_high,
-          onPressed: _analyze,
-          enabled: canUseChat,
+        const SizedBox(height: 14),
+        const _MonitorCapabilityTile(
+          icon: Icons.visibility_outlined,
+          title: 'Passive frame capture',
+          body:
+              'The scanner captures two frames per second and discards duplicates before analysis.',
+        ),
+        const SizedBox(height: 12),
+        const _MonitorCapabilityTile(
+          icon: Icons.psychology_alt_outlined,
+          title: 'Behavioral deception signals',
+          body:
+              'The model watches for emotional leverage, financial urgency, and verification avoidance.',
+        ),
+        const SizedBox(height: 28),
+        const EditorialSectionTitle(
+          title: 'Recent Activity',
+          subtitle: 'Mock feed for the first rewrite pass.',
+          trailing: MockTag(),
+        ),
+        const SizedBox(height: 14),
+        const _RecentActivityCard(
+          title: 'WhatsApp Thread #242',
+          meta: 'Live scan · 14:20',
+          label: 'Low Risk',
+          score: 12,
+        ),
+        const SizedBox(height: 12),
+        const _RecentActivityCard(
+          title: 'Messenger Activity',
+          meta: 'Potential threat · 09:15',
+          label: 'Potential Threat',
+          score: 45,
+        ),
+        const SizedBox(height: 12),
+        const _RecentActivityCard(
+          title: 'Dating App Scan',
+          meta: 'Clean conversation · 22:04',
+          label: 'Clean',
+          score: 5,
         ),
       ],
     );
   }
 
-  // ── Analyzing ────────────────────────────────────────────────────────────
+  Widget _buildScanning() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const EditorialEyebrow(
+          label: 'ACTIVE MONITORING',
+          icon: Icons.radar,
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Scroll naturally.\nWe are watching for signal.',
+          style: AppTheme.headline(
+            34,
+            weight: FontWeight.w800,
+            color: AppTheme.primary,
+            height: 0.98,
+          ),
+        ),
+        const SizedBox(height: 18),
+        GlassPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.error,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Recording in progress',
+                    style: AppTheme.headline(
+                      16,
+                      color: AppTheme.error,
+                      weight: FontWeight.w800,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '$_frameCount frames',
+                    style: AppTheme.label(10),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              const SplitBackgroundFill(height: 190),
+              const SizedBox(height: 18),
+              TonalPanel(
+                radius: 22,
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: AppTheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Only changed frames are kept in memory. Nothing from the conversation is written to disk.',
+                        style: AppTheme.body(
+                          12,
+                          color: AppTheme.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              GradientCtaButton(
+                label: 'Analyze Captured Frames',
+                icon: Icons.auto_awesome,
+                onPressed: _analyze,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildAnalyzing() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 48),
-        const LinearProgressIndicator(color: AppTheme.primaryContainer),
-        const SizedBox(height: 16),
-        Text('Analyzing frames...',
-            style: AppTheme.body(12, color: AppTheme.onSurfaceVariant)),
-      ],
+    return Center(
+      child: GlassPanel(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const EditorialEyebrow(
+              label: 'ANALYZING',
+              icon: Icons.psychology_alt_outlined,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Composing the report',
+              style: AppTheme.headline(
+                28,
+                color: AppTheme.primary,
+                weight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'The model is reviewing the captured sequence for coercion patterns, urgency language, and trust inconsistencies.',
+              textAlign: TextAlign.center,
+              style: AppTheme.body(
+                13,
+                color: AppTheme.onSurfaceVariant,
+                height: 1.55,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const LinearProgressIndicator(
+              color: AppTheme.primaryContainer,
+              minHeight: 6,
+              borderRadius: BorderRadius.all(Radius.circular(999)),
+            ),
+          ],
+        ),
+      ),
     );
   }
-
-  // ── Report ───────────────────────────────────────────────────────────────
 
   Widget _buildReport(RiskReport report) {
     final color = AppTheme.riskLevelColor(report.riskLevel);
-    final bg = AppTheme.riskLevelBackground(report.riskLevel);
     final canFlagProfile = isRiskLevelEligibleForCommunity(report.riskLevel);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: AppTheme.surfaceCard(),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${report.riskScore}',
-                style: GoogleFonts.manrope(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                    height: 1),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4, left: 2),
-                child: Text('/100',
-                    style:
-                        AppTheme.body(12, color: AppTheme.onSurfaceVariant)),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                    color: bg, borderRadius: BorderRadius.circular(20)),
-                child: Text(report.riskLevel,
-                    style: AppTheme.label(10, color: color)),
-              ),
-            ],
-          ),
+        const EditorialEyebrow(
+          label: 'REPORT STATE',
+          icon: Icons.insights_outlined,
         ),
-        if (report.redFlags.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _SectionBox(
-            title: 'Red Flags',
-            icon: Icons.warning_amber_outlined,
-            child: Column(
-              children: report.redFlags
-                  .map((f) => _RedFlagCard(flag: f))
-                  .toList(),
+        const SizedBox(height: 18),
+        Stack(
+          children: [
+            const Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.only(top: 36, bottom: 36),
+                child: SplitBackgroundFill(height: 460),
+              ),
             ),
-          ),
-        ],
-        if (report.recommendedActions.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          _SectionBox(
-            title: 'Recommended Actions',
-            icon: Icons.checklist_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: report.recommendedActions
-                  .map((a) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
+            GlassPanel(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.arrow_right,
-                                size: 14,
-                                color: AppTheme.primaryContainer),
-                            const SizedBox(width: 4),
-                            Expanded(
-                                child: Text(a, style: AppTheme.body(11))),
+                            RiskBadge(label: report.riskLevel),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Sentiment\nAnalysis',
+                              style: AppTheme.headline(
+                                30,
+                                color: AppTheme.onSurface,
+                                weight: FontWeight.w800,
+                                height: 0.95,
+                              ),
+                            ),
                           ],
                         ),
-                      ))
-                  .toList(),
+                      ),
+                      MetricRing(
+                        score: report.riskScore,
+                        label: 'RISK SCORE',
+                        color: color,
+                        size: 108,
+                      ),
+                    ],
+                  ),
+                  if (report.redFlags.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      'DETECTED INDICATORS',
+                      style: AppTheme.label(11, weight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 12),
+                    ...report.redFlags.map(
+                      (flag) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _IndicatorCard(flag: flag),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  TonalPanel(
+                    color: AppTheme.surfaceLow,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'PROFESSIONAL INSIGHT',
+                          style: AppTheme.label(11, weight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          report.summary,
+                          style: AppTheme.body(
+                            13,
+                            weight: FontWeight.w600,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (report.recommendedActions.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      'SAFEGUARD PROTOCOL',
+                      style: AppTheme.label(11, weight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 12),
+                    ...report.recommendedActions.map(
+                      (action) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _SafeguardRow(action: action),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  GradientCtaButton(
+                    label: 'Flag This Profile',
+                    icon: Icons.flag_outlined,
+                    onPressed: canFlagProfile ? _openCommunityFlagFlow : null,
+                    enabled: canFlagProfile,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _reset,
+                      child: const Text('Close Report'),
+                    ),
+                  ),
+                  if (!canFlagProfile) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Community flagging unlocks after a completed scan result.',
+                      textAlign: TextAlign.center,
+                      style: AppTheme.body(
+                        11,
+                        color: AppTheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-        ],
-        if (report.summary.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          _SectionBox(
-            title: 'Summary',
-            icon: Icons.summarize_outlined,
-            child: Text(report.summary,
-                style: AppTheme.body(11,
-                    color: AppTheme.onSurfaceVariant)),
-          ),
-        ],
-        const SizedBox(height: 12),
-        _GradientButton(
-          label: 'Flag This Profile',
-          icon: Icons.flag_outlined,
-          onPressed: canFlagProfile ? _openCommunityFlagFlow : () {},
-          enabled: canFlagProfile,
+          ],
         ),
-        if (!canFlagProfile) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Community flagging unlocks after a completed scan result.',
-            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
-            textAlign: TextAlign.center,
-          ),
-        ],
-        const SizedBox(height: 16),
-        OutlinedButton(
-          onPressed: _reset,
-          child: const Text('New Scan'),
-        ),
-        const SizedBox(height: 8),
       ],
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────────────────────
-
   Widget _buildError() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 32),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppTheme.errorContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(children: [
-            const Icon(Icons.error_outline, color: AppTheme.error, size: 28),
-            const SizedBox(height: 6),
-            Text('Analysis failed',
-                style: AppTheme.headline(13, color: AppTheme.error)),
-            const SizedBox(height: 4),
-            Text(_errorMessage ?? '',
-                style: AppTheme.body(11, color: AppTheme.onSurfaceVariant),
-                textAlign: TextAlign.center),
-          ]),
+    return Center(
+      child: GlassPanel(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppTheme.errorContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                color: AppTheme.error,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Analysis failed',
+              style: AppTheme.headline(
+                24,
+                color: AppTheme.error,
+                weight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _errorMessage ?? '',
+              textAlign: TextAlign.center,
+              style: AppTheme.body(
+                13,
+                color: AppTheme.onSurfaceVariant,
+                height: 1.55,
+              ),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton(
+              onPressed: _reset,
+              child: const Text('Try Again'),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        OutlinedButton(onPressed: _reset, child: const Text('Try Again')),
-      ],
+      ),
     );
   }
 
@@ -524,79 +747,50 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   }
 }
 
-// ── Shared sub-widgets ────────────────────────────────────────────────────────
+class _MonitorCapabilityTile extends StatelessWidget {
+  const _MonitorCapabilityTile({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
 
-class _GradientButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-  final bool enabled;
-  const _GradientButton(
-      {required this.label,
-      required this.icon,
-      required this.onPressed,
-      this.enabled = true});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onPressed : null,
-      child: Container(
-        height: 46,
-        decoration: enabled
-            ? AppTheme.gradientBox(radius: 12)
-            : BoxDecoration(
-                color: AppTheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: enabled ? Colors.white : AppTheme.onSurfaceVariant,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Text(label,
-                style: GoogleFonts.manrope(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color:
-                        enabled ? Colors.white : AppTheme.onSurfaceVariant)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HowItWorksCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String body;
-  const _HowItWorksCard(
-      {required this.icon, required this.title, required this.body});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: AppTheme.tonalSection(),
+    return TonalPanel(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: AppTheme.primaryContainer),
-          const SizedBox(width: 10),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryFixed,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: AppTheme.primary),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTheme.headline(12)),
-                const SizedBox(height: 2),
-                Text(body,
-                    style: AppTheme.body(11,
-                        color: AppTheme.onSurfaceVariant)),
+                Text(
+                  title,
+                  style: AppTheme.headline(15, weight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: AppTheme.body(
+                    12,
+                    color: AppTheme.onSurfaceVariant,
+                    height: 1.55,
+                  ),
+                ),
               ],
             ),
           ),
@@ -606,71 +800,240 @@ class _HowItWorksCard extends StatelessWidget {
   }
 }
 
-class _SectionBox extends StatelessWidget {
-  final String title;
+class _PlatformChoiceChip extends StatelessWidget {
+  const _PlatformChoiceChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
   final IconData icon;
-  final Widget child;
-  const _SectionBox(
-      {required this.title, required this.icon, required this.child});
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: AppTheme.tonalSection(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final background =
+        selected ? Colors.white : Colors.white.withValues(alpha: 0.12);
+    final foreground =
+        selected ? AppTheme.primary : Colors.white.withValues(alpha: 0.92);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.14),
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: foreground),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: AppTheme.body(
+                12,
+                color: foreground,
+                weight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentActivityCard extends StatelessWidget {
+  const _RecentActivityCard({
+    required this.title,
+    required this.meta,
+    required this.label,
+    required this.score,
+  });
+
+  final String title;
+  final String meta;
+  final String label;
+  final int score;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppTheme.riskColor(100 - score);
+    final safeLabel = label.toUpperCase();
+
+    return SurfacePanel(
+      padding: const EdgeInsets.all(20),
+      child: Row(
         children: [
-          Row(children: [
-            Icon(icon, size: 13, color: AppTheme.primaryContainer),
-            const SizedBox(width: 6),
-            Text(title, style: AppTheme.headline(11)),
-          ]),
-          const SizedBox(height: 8),
-          child,
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(Icons.verified_user_outlined, color: color),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTheme.headline(15, weight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text(
+                  meta,
+                  style: AppTheme.body(12, color: AppTheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                safeLabel,
+                style: AppTheme.label(
+                  10,
+                  color: color,
+                  weight: FontWeight.w800,
+                  letterSpacing: 1.4,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: 52,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: (score / 100).clamp(0.04, 1.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _RedFlagCard extends StatelessWidget {
+class _IndicatorCard extends StatelessWidget {
+  const _IndicatorCard({required this.flag});
+
   final RedFlag flag;
-  const _RedFlagCard({required this.flag});
 
   @override
   Widget build(BuildContext context) {
     final severityColor = AppTheme.severityColor(flag.severity);
     final severityBg = AppTheme.severityBackground(flag.severity);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceLowest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
+    return SurfacePanel(
+      padding: const EdgeInsets.all(18),
+      radius: 22,
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Expanded(
-                child: Text(flag.pattern, style: AppTheme.headline(11))),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                  color: severityBg,
-                  borderRadius: BorderRadius.circular(10)),
-              child: Text(flag.severity.toUpperCase(),
-                  style: AppTheme.label(9, color: severityColor)),
+          Icon(Icons.warning_amber_rounded, color: severityColor, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        flag.pattern,
+                        style: AppTheme.headline(15, weight: FontWeight.w800),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    RiskBadge(
+                      label: flag.severity,
+                      color: severityColor,
+                      background: severityBg,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  flag.evidence,
+                  style: AppTheme.body(
+                    12,
+                    color: AppTheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                ),
+              ],
             ),
-          ]),
-          const SizedBox(height: 4),
-          Text(flag.evidence,
-              style: AppTheme.body(10, color: AppTheme.onSurfaceVariant)),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _SafeguardRow extends StatelessWidget {
+  const _SafeguardRow({required this.action});
+
+  final String action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          margin: const EdgeInsets.only(top: 5),
+          decoration: const BoxDecoration(
+            color: AppTheme.error,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            action,
+            style: AppTheme.body(13, height: 1.5),
+          ),
+        ),
+      ],
     );
   }
 }

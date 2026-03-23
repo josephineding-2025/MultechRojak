@@ -2,76 +2,143 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // --- Colors ---
   static const primary = Color(0xFF000666);
   static const primaryContainer = Color(0xFF1A237E);
+  static const primaryFixed = Color(0xFFE0E0FF);
   static const surface = Color(0xFFF9F9F9);
   static const surfaceLow = Color(0xFFF3F3F3);
   static const surfaceLowest = Color(0xFFFFFFFF);
   static const surfaceContainer = Color(0xFFEEEEEE);
+  static const surfaceContainerHigh = Color(0xFFE8E8E8);
   static const onSurface = Color(0xFF1A1C1C);
   static const onSurfaceVariant = Color(0xFF454652);
   static const secondary = Color(0xFF785900);
   static const secondaryContainer = Color(0xFFFDC003);
+  static const success = Color(0xFF2E7D32);
+  static const successContainer = Color(0xFFE8F5E9);
   static const error = Color(0xFFBA1A1A);
   static const errorContainer = Color(0xFFFFDAD6);
   static const outline = Color(0xFF767683);
   static const outlineVariant = Color(0xFFC6C5D4);
   static const inverseSurface = Color(0xFF2F3131);
+  static const monitorBackground = Color(0xFF101216);
+  static const monitorBackgroundSoft = Color(0xFF1A1C1C);
 
-  // --- Gradient ---
   static const gradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [primary, primaryContainer],
   );
 
-  // --- Shadows ---
-  static final ambientShadow = BoxShadow(
-    offset: const Offset(0, 4),
-    blurRadius: 16,
-    color: const Color(0xFF1A237E).withValues(alpha: 0.06),
+  static const warmBackground = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFFF9F9F9), Color(0xFFF1F2F8)],
   );
 
-  // --- Decorations ---
-  static BoxDecoration glassCard({double radius = 12}) => BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
+  static const darkMonitorGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF181A1E), Color(0xFF090A0D)],
+  );
+
+  static final ambientShadow = BoxShadow(
+    offset: const Offset(0, 16),
+    blurRadius: 32,
+    color: primaryContainer.withValues(alpha: 0.08),
+  );
+
+  static final elevatedShadow = BoxShadow(
+    offset: const Offset(0, 20),
+    blurRadius: 48,
+    color: primaryContainer.withValues(alpha: 0.14),
+  );
+
+  static BoxDecoration glassCard({double radius = 28}) => BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
         boxShadow: [ambientShadow],
       );
 
-  static BoxDecoration surfaceCard({double radius = 8}) => BoxDecoration(
+  static BoxDecoration surfaceCard({double radius = 24}) => BoxDecoration(
         color: surfaceLowest,
         borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: outlineVariant.withValues(alpha: 0.18)),
         boxShadow: [ambientShadow],
       );
 
-  static BoxDecoration gradientBox({double radius = 12}) => BoxDecoration(
+  static BoxDecoration gradientBox({double radius = 24}) => BoxDecoration(
         gradient: gradient,
         borderRadius: BorderRadius.circular(radius),
+        boxShadow: [elevatedShadow],
       );
 
-  static BoxDecoration tonalSection({double radius = 8}) => BoxDecoration(
+  static BoxDecoration tonalSection({double radius = 24}) => BoxDecoration(
         color: surfaceLow,
         borderRadius: BorderRadius.circular(radius),
       );
 
-  // --- Text Styles ---
-  static TextStyle headline(double size,
-          {FontWeight weight = FontWeight.bold, Color? color}) =>
+  static BoxDecoration darkGlass({double radius = 24}) => BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 32,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      );
+
+  static BoxDecoration editorialPageBackground({bool dark = false}) =>
+      BoxDecoration(
+        gradient: dark ? darkMonitorGradient : warmBackground,
+      );
+
+  static TextStyle headline(
+    double size, {
+    FontWeight weight = FontWeight.bold,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) =>
       GoogleFonts.manrope(
-          fontSize: size, fontWeight: weight, color: color ?? onSurface);
+        fontSize: size,
+        fontWeight: weight,
+        color: color ?? onSurface,
+        height: height,
+        letterSpacing: letterSpacing,
+      );
 
-  static TextStyle body(double size,
-          {FontWeight weight = FontWeight.normal, Color? color}) =>
+  static TextStyle body(
+    double size, {
+    FontWeight weight = FontWeight.normal,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) =>
       GoogleFonts.inter(
-          fontSize: size, fontWeight: weight, color: color ?? onSurface);
+        fontSize: size,
+        fontWeight: weight,
+        color: color ?? onSurface,
+        height: height,
+        letterSpacing: letterSpacing,
+      );
 
-  static TextStyle label(double size, {Color? color}) => GoogleFonts.inter(
-      fontSize: size,
-      fontWeight: FontWeight.w500,
-      letterSpacing: 0.5,
-      color: color ?? onSurfaceVariant);
+  static TextStyle label(
+    double size, {
+    Color? color,
+    FontWeight weight = FontWeight.w600,
+    double letterSpacing = 1.2,
+  }) =>
+      GoogleFonts.inter(
+        fontSize: size,
+        fontWeight: weight,
+        letterSpacing: letterSpacing,
+        color: color ?? onSurfaceVariant,
+      );
 
   // --- Risk colors ---
   static Color riskColor(int score) {
@@ -146,26 +213,35 @@ class AppTheme {
           color: surfaceLowest,
           elevation: 0,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
+            borderRadius: BorderRadius.circular(24),
+          ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFFE8E8E8),
+          fillColor: surfaceLowest,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
             borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
             borderSide: const BorderSide(color: primaryContainer, width: 2),
           ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: BorderSide.none,
+          ),
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          labelStyle: GoogleFonts.inter(fontSize: 12, color: onSurfaceVariant),
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          labelStyle: GoogleFonts.inter(
+            fontSize: 12,
+            color: onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
           hintStyle: GoogleFonts.inter(fontSize: 12, color: outline),
         ),
         filledButtonTheme: FilledButtonThemeData(
@@ -173,49 +249,37 @@ class AppTheme {
             backgroundColor: primary,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-            textStyle:
-                GoogleFonts.manrope(fontWeight: FontWeight.w600, fontSize: 13),
-            minimumSize: const Size.fromHeight(44),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            textStyle: GoogleFonts.manrope(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+            minimumSize: const Size.fromHeight(52),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             foregroundColor: primary,
-            side: const BorderSide(color: primaryContainer),
+            side: BorderSide(color: outlineVariant.withValues(alpha: 0.6)),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-            textStyle:
-                GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 12),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            textStyle: GoogleFonts.inter(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
           ),
-        ),
-        navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: surfaceLowest,
-          indicatorColor: primaryContainer.withValues(alpha: 0.12),
-          labelTextStyle: WidgetStateProperty.resolveWith((states) {
-            final selected = states.contains(WidgetState.selected);
-            return GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-              color: selected ? primary : onSurfaceVariant,
-            );
-          }),
-          iconTheme: WidgetStateProperty.resolveWith((states) {
-            final selected = states.contains(WidgetState.selected);
-            return IconThemeData(
-              size: 20,
-              color: selected ? primary : onSurfaceVariant,
-            );
-          }),
-          height: 60,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         ),
         chipTheme: ChipThemeData(
           backgroundColor: surfaceContainer,
           labelStyle: GoogleFonts.inter(fontSize: 10, color: onSurface),
           padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           side: BorderSide.none,
         ),
+        dividerColor: Colors.transparent,
       );
 }
