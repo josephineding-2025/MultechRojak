@@ -68,6 +68,17 @@ def _to_data_uri(image_b64: str) -> str:
     return f"data:image/png;base64,{clean}"
 
 
+def _decode_base64_payload(payload: str) -> bytes:
+    clean = payload.strip()
+    if clean.lower().startswith("data:") and "," in clean:
+        clean = clean.split(",", 1)[1]
+
+    try:
+        return base64.b64decode(clean, validate=True)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("audio_b64 is not valid base64 data.") from exc
+
+
 def _chunk_frames(frames: Sequence[str], batch_size: int = 10) -> List[List[str]]:
     return [list(frames[i : i + batch_size]) for i in range(0, len(frames), batch_size)]
 
@@ -218,10 +229,7 @@ def _transcribe_audio(audio_b64: str) -> str:
     if not audio_b64:
         raise ValueError("Audio payload is required.")
 
-    try:
-        audio_bytes = base64.b64decode(audio_b64)
-    except Exception as exc:  # noqa: BLE001
-        raise ValueError("audio_b64 is not valid base64 data.") from exc
+    audio_bytes = _decode_base64_payload(audio_b64)
 
     client = OpenAI(api_key=_require_env("OPENAI_API_KEY"))
     stream = io.BytesIO(audio_bytes)

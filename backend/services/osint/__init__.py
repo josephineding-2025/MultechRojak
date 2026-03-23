@@ -24,12 +24,26 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _decode_base64_payload(payload: str) -> bytes:
+    if not payload or not payload.strip():
+        raise ValueError("payload must not be empty")
+
+    clean = payload.strip()
+    if "," in clean and clean.lower().startswith("data:"):
+        clean = clean.split(",", 1)[1]
+
+    try:
+        return b64decode(clean, validate=True)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("Invalid base64 payload.") from exc
+
+
 def validate_phone(phone: str) -> dict:
     if not phone or not phone.strip():
         raise ValueError("phone must not be empty")
     key = _require_env("NUMVERIFY_API_KEY")
     resp = requests.get(
-        "http://apilayer.net/api/validate",
+        "https://apilayer.net/api/validate",
         params={"access_key": key, "number": phone},
         timeout=10,
     )
@@ -78,7 +92,7 @@ def check_username_platforms(username: str) -> list[str]:
 
 def compute_phash(photo_b64: str) -> str:
     try:
-        img = Image.open(BytesIO(b64decode(photo_b64)))
+        img = Image.open(BytesIO(_decode_base64_payload(photo_b64)))
         return str(imagehash.phash(img))
     except Exception as exc:
         raise ValueError(f"Failed to compute phash: {exc}") from exc
@@ -86,10 +100,11 @@ def compute_phash(photo_b64: str) -> str:
 
 def reverse_image_search(photo_b64: str) -> list[str]:
     key = _require_env("SERPAPI_KEY")
+    photo_bytes = _decode_base64_payload(photo_b64)
     resp = requests.post(
         "https://serpapi.com/search",
         params={"engine": "google_reverse_image", "api_key": key},
-        files={"image_file": ("photo.jpg", b64decode(photo_b64), "image/jpeg")},
+        files={"image_file": ("photo.jpg", photo_bytes, "image/jpeg")},
         timeout=30,
     )
     if resp.status_code != 200:
@@ -220,6 +235,10 @@ def run_background_check(
 
     if not username or not username.strip():
         raise ValueError("username must not be empty")
+    if not platform or not platform.strip():
+        raise ValueError("platform must not be empty")
+    if photo_b64 and photo_b64.strip():
+        _decode_base64_payload(photo_b64)
 
     # --- Username platforms ---
     username_platforms = check_username_platforms(username.strip())

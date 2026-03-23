@@ -2,16 +2,20 @@
 Community Flagging router — Owner: Member 3
 Allows users to report scammers and warn others via a shared community database.
 """
-from fastapi import APIRouter
-from pydantic import BaseModel
 from typing import List, Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from services.flagging import check_profile as check_profile_service
+from services.flagging import submit_scammer_report
 
 router = APIRouter(tags=["Community Flagging"])
 
 
 class FlagScammerRequest(BaseModel):
     platform: str
-    handle: str
+    handle: Optional[str] = None
     phone: Optional[str] = None
     photo_hash: Optional[str] = None
     flags: List[str]
@@ -37,16 +41,22 @@ class ProfileCheckResult(BaseModel):
 async def flag_scammer(req: FlagScammerRequest) -> FlagScammerResult:
     """
     Submit a community flag for a scammer profile.
-
-    TODO (Member 3): Replace mock with real Supabase upsert.
-    See backend/services/flagging/ for the implementation stub.
     """
-    # --- MOCK RESPONSE — matches SPEC.md Section 8 exactly ---
-    return FlagScammerResult(
-        success=True,
-        profile_status="flagged",
-        total_reports=8,
-    )
+    try:
+        result = submit_scammer_report(
+            platform=req.platform,
+            handle=req.handle,
+            phone=req.phone,
+            photo_hash=req.photo_hash,
+            flags=req.flags,
+            region=req.region,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail="Failed to submit scammer report") from exc
+
+    return FlagScammerResult(**result)
 
 
 @router.get("/check-profile", response_model=ProfileCheckResult)
@@ -57,16 +67,19 @@ async def check_profile(
 ) -> ProfileCheckResult:
     """
     Check if a profile matches any community-flagged entries.
-
-    TODO (Member 3): Replace mock with real Supabase query + fuzzy matching.
-    See backend/services/flagging/ for the implementation stub.
     """
-    # --- MOCK RESPONSE — matches SPEC.md Section 8 exactly ---
-    return ProfileCheckResult(
-        flagged=True,
-        status="flagged",
-        report_count=7,
-        first_reported="2026-01-12",
-        common_flags=["money request", "fake investment"],
-        region="MY",
-    )
+    if not any([handle and handle.strip(), phone and phone.strip(), photo_hash and photo_hash.strip()]):
+        raise HTTPException(status_code=400, detail="At least one of handle, phone, or photo_hash is required")
+
+    try:
+        result = check_profile_service(
+            handle=handle,
+            phone=phone,
+            photo_hash=photo_hash,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail="Failed to check profile") from exc
+
+    return ProfileCheckResult(**result)
