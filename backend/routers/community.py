@@ -3,13 +3,14 @@ Community Flagging router — Owner: Member 3
 Allows users to report scammers and warn others via a shared community database.
 """
 import logging
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, HTTPException
 import httpx
 from pydantic import BaseModel
 
 from services.flagging import check_profile as check_profile_service
+from services.flagging import get_recent_reports, status_from_report_count
 from services.flagging import submit_scammer_report
 
 router = APIRouter(tags=["Community Flagging"])
@@ -51,6 +52,8 @@ class ProfileCheckResult(BaseModel):
     first_reported: Optional[str] = None
     common_flags: Optional[List[str]] = None
     region: Optional[str] = None
+    photo_hash: Optional[str] = None
+    handle: Optional[str] = None
 
 
 @router.post("/flag-scammer", response_model=FlagScammerResult)
@@ -117,4 +120,40 @@ async def check_profile(
             detail=_detail_for_community_error(exc),
         ) from exc
 
-    return ProfileCheckResult(**result)
+    matched = result.get('matched_result') or {}
+    return ProfileCheckResult(
+        **{k: v for k, v in result.items() if k != 'matched_result'},
+        photo_hash=matched.get('photo_hash'),
+        handle=matched.get('handle'),
+    )
+
+
+class FeedEntry(BaseModel):
+    id: Optional[Any] = None
+    platform: Optional[str] = None
+    handle: Optional[str] = None
+    region: Optional[str] = None
+    report_count: Optional[int] = None
+    last_reported: Optional[str] = None
+    common_flags: Optional[List[str]] = None
+    status: Optional[str] = None
+
+
+@router.get("/community/feed", response_model=List[FeedEntry])
+async def community_feed(limit: int = 10) -> List[FeedEntry]:
+    """Return most recent community-flagged profiles ordered by last_reported."""
+    try:
+        rows = get_recent_reports(limit=min(limit, 50))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Community feed failed")
+        raise HTTPException(
+            status_code=500,
+            detail=_detail_for_community_error(exc),
+        ) from exc
+    return [
+        FeedEntry(
+            **row,
+            status=status_from_report_count(row.get("report_count") or 0),
+        )
+        for row in rows
+    ]

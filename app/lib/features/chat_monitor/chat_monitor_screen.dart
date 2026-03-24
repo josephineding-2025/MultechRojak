@@ -362,18 +362,33 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
           subtitle: 'A privacy-first monitor that behaves like a premium safety overlay.',
         ),
         const SizedBox(height: 14),
-        const _MonitorCapabilityTile(
-          icon: Icons.visibility_outlined,
-          title: 'Passive frame capture',
-          body:
-              'The scanner captures two frames per second and discards duplicates before analysis.',
-        ),
-        const SizedBox(height: 12),
-        const _MonitorCapabilityTile(
-          icon: Icons.psychology_alt_outlined,
-          title: 'Behavioral deception signals',
-          body:
-              'The model watches for emotional leverage, financial urgency, and verification avoidance.',
+        const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _InfoCard(
+                icon: Icons.visibility_outlined,
+                title: 'Passive Capture',
+                body: 'Captures 2fps, memory-only — no disk writes.',
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: _InfoCard(
+                icon: Icons.psychology_alt_outlined,
+                title: 'AI Analysis',
+                body: 'Vision LLM detects scam patterns per frame.',
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: _InfoCard(
+                icon: Icons.report_problem_outlined,
+                title: 'Instant Report',
+                body: 'Risk score with evidence and actions.',
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 28),
         const EditorialSectionTitle(
@@ -747,8 +762,8 @@ class _ChatMonitorScreenState extends ConsumerState<ChatMonitorScreen> {
   }
 }
 
-class _MonitorCapabilityTile extends StatelessWidget {
-  const _MonitorCapabilityTile({
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({
     required this.icon,
     required this.title,
     required this.body,
@@ -760,39 +775,22 @@ class _MonitorCapabilityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TonalPanel(
-      child: Row(
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: AppTheme.surfaceCard(radius: 20),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryFixed,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: AppTheme.primary),
+          Icon(icon, size: 22, color: AppTheme.primary),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: AppTheme.label(11, weight: FontWeight.w800, letterSpacing: 0.4),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: AppTheme.headline(15, weight: FontWeight.w800),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  body,
-                  style: AppTheme.body(
-                    12,
-                    color: AppTheme.onSurfaceVariant,
-                    height: 1.55,
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 6),
+          Text(
+            body,
+            style: AppTheme.body(11, color: AppTheme.onSurfaceVariant, height: 1.45),
           ),
         ],
       ),

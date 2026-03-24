@@ -520,6 +520,19 @@ def submit_scammer_report(
     }
 
 
+def get_recent_reports(limit: int = 10) -> list[dict[str, Any]]:
+    """Return most recent scammer profiles ordered by last_reported desc."""
+    response = (
+        get_supabase_client()
+        .table(TABLE_NAME)
+        .select("id, platform, handle, region, report_count, last_reported, common_flags")
+        .order("last_reported", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return list(response.data or [])
+
+
 def check_profile(
     *,
     handle: Optional[str] = None,

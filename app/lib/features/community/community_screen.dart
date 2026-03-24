@@ -502,24 +502,54 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           const SizedBox(height: 20),
           const EditorialSectionTitle(
             title: 'Regional intelligence feed',
-            subtitle: 'Mock-first presentation for the Stitch community cards.',
-            trailing: MockTag(label: 'Feed mock'),
+            subtitle: 'Live community reports ordered by most recent activity.',
           ),
           const SizedBox(height: 14),
-          const _MockFeedCard(
-            handle: '@crypto_lover_99',
-            region: 'Malaysia',
-            status: 'Flagged',
-            summary:
-                'Promising 300% returns on “gold-linked” digital assets in private WhatsApp groups.',
-          ),
-          const SizedBox(height: 12),
-          const _MockFeedCard(
-            handle: '@bank_secure_fix',
-            region: 'Indonesia',
-            status: 'Confirmed',
-            summary:
-                'Verified malicious banking impersonation campaign with phishing links in the bio.',
+          Consumer(
+            builder: (context, ref, _) {
+              final feedAsync = ref.watch(communityFeedProvider);
+              return feedAsync.when(
+                loading: () => const LinearProgressIndicator(
+                  color: AppTheme.primaryContainer,
+                  minHeight: 5,
+                  borderRadius: BorderRadius.all(Radius.circular(999)),
+                ),
+                error: (_, __) => const TonalPanel(
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, size: 18, color: AppTheme.error),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Could not load community reports',
+                          style: TextStyle(
+                            color: AppTheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                data: (entries) => entries.isEmpty
+                    ? const TonalPanel(
+                        child: Text(
+                          'No community reports yet.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      )
+                    : Column(
+                        children: entries
+                            .map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _FeedCard(entry: e),
+                              ),
+                            )
+                            .toList(),
+                      ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           const _MockThreatCard(),
@@ -836,6 +866,30 @@ class _FlaggedCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.errorContainer,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 18, color: AppTheme.error),
+              SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  'Exercise extreme caution when interacting with this profile.',
+                  style: TextStyle(
+                    color: AppTheme.error,
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         GlassPanel(
           radius: 28,
           child: Column(
@@ -888,78 +942,52 @@ class _FlaggedCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: TonalPanel(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Report Metrics',
-                            style: AppTheme.label(10, weight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            '${result.reportCount ?? 0}',
-                            style: AppTheme.headline(
-                              34,
-                              color: AppTheme.primary,
-                              weight: FontWeight.w800,
-                            ),
-                          ),
-                          Text(
-                            'Total reports',
-                            style: AppTheme.body(
-                              12,
-                              color: AppTheme.onSurfaceVariant,
-                            ),
-                          ),
-                          if (result.firstReported != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              'First reported ${result.firstReported}',
-                              style: AppTheme.body(
-                                11,
-                                color: AppTheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                    child: _MetricTile(
+                      icon: Icons.flag_outlined,
+                      value: '${result.reportCount ?? 0}',
+                      label: 'Reports',
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: TonalPanel(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Identified Patterns',
-                            style: AppTheme.label(10, weight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 10),
-                          if (result.commonFlags != null &&
-                              result.commonFlags!.isNotEmpty)
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: result.commonFlags!
-                                  .map((flag) => _InfoChip(label: flag))
-                                  .toList(),
-                            )
-                          else
-                            Text(
-                              'No pattern metadata attached.',
-                              style: AppTheme.body(
-                                12,
-                                color: AppTheme.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
+                    child: _MetricTile(
+                      icon: Icons.calendar_today_outlined,
+                      value: result.firstReported ?? '–',
+                      label: 'First seen',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MetricTile(
+                      icon: Icons.public,
+                      value: result.region ?? '–',
+                      label: 'Region',
                     ),
                   ),
                 ],
               ),
+              if (result.commonFlags != null &&
+                  result.commonFlags!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: result.commonFlags!
+                      .map((flag) => _InfoChip(label: flag))
+                      .toList(),
+                ),
+              ],
+              if (result.photoHash != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Photo hash: ${result.photoHash!.substring(0, result.photoHash!.length > 8 ? 8 : result.photoHash!.length)}...',
+                  style: AppTheme.label(
+                    10,
+                    color: AppTheme.onSurfaceVariant,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1158,72 +1186,6 @@ class _ToggleChip extends StatelessWidget {
   }
 }
 
-class _MockFeedCard extends StatelessWidget {
-  const _MockFeedCard({
-    required this.handle,
-    required this.region,
-    required this.status,
-    required this.summary,
-  });
-
-  final String handle;
-  final String region;
-  final String status;
-  final String summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final upperStatus = status.toUpperCase();
-    final color = AppTheme.severityColor(upperStatus);
-    final background = AppTheme.severityBackground(upperStatus);
-
-    return SurfacePanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      handle,
-                      style: AppTheme.headline(
-                        20,
-                        color: AppTheme.primary,
-                        weight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      region,
-                      style: AppTheme.body(
-                        12,
-                        color: AppTheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              RiskBadge(label: upperStatus, color: color, background: background),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            summary,
-            style: AppTheme.body(
-              12,
-              color: AppTheme.onSurfaceVariant,
-              height: 1.55,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _MockThreatCard extends StatelessWidget {
   const _MockThreatCard();
@@ -1256,6 +1218,18 @@ class _MockThreatCard extends StatelessWidget {
               height: 1.55,
             ),
           ),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: () {},
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: const Text('Read Report →'),
+          ),
         ],
       ),
     );
@@ -1278,6 +1252,120 @@ class _InfoChip extends StatelessWidget {
       child: Text(
         label,
         style: AppTheme.label(10, weight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+Color _feedStatusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'confirmed':
+      return AppTheme.error;
+    case 'flagged':
+      return const Color(0xFFF57F17);
+    default:
+      return const Color(0xFF2E7D32);
+  }
+}
+
+class _FeedCard extends StatelessWidget {
+  const _FeedCard({required this.entry});
+
+  final CommunityFeedEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _feedStatusColor(entry.status ?? 'reported');
+    final statusLabel = (entry.status ?? 'reported').toUpperCase();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.surfaceCard(radius: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.person_off_outlined, size: 18, color: statusColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.handle ?? 'Unknown',
+                  style: AppTheme.headline(14, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (entry.region != null) ...[
+                      _InfoChip(label: entry.region!),
+                      const SizedBox(width: 6),
+                    ],
+                    RiskBadge(
+                      label: statusLabel,
+                      color: statusColor,
+                      background: statusColor.withValues(alpha: 0.12),
+                    ),
+                  ],
+                ),
+                if (entry.lastReported != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    entry.lastReported!,
+                    style: AppTheme.body(
+                      11,
+                      color: AppTheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: AppTheme.surfaceCard(radius: 16),
+      child: Column(
+        children: [
+          Icon(icon, size: 18, color: AppTheme.primary),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: AppTheme.headline(13, weight: FontWeight.w800),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: AppTheme.label(9, letterSpacing: 0.8),
+          ),
+        ],
       ),
     );
   }

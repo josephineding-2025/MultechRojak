@@ -37,6 +37,7 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
   String _statusMessage = 'Visual monitoring ready.';
   String? _errorMessage;
   String _sessionId = 'video_${DateTime.now().millisecondsSinceEpoch}';
+  bool _isMuted = false;
 
   @override
   void dispose() {
@@ -334,6 +335,16 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        const Row(
+          children: [
+            _StatChip(label: 'Latency', value: '--ms'),
+            SizedBox(width: 8),
+            _StatChip(label: 'Res', value: '1080p'),
+            SizedBox(width: 8),
+            _StatChip(label: 'Shield', value: 'ON', highlight: true),
+          ],
+        ),
         const SizedBox(height: 18),
         Container(
           width: double.infinity,
@@ -341,7 +352,12 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
           padding: const EdgeInsets.all(22),
           child: Column(
             children: [
-              const SplitBackgroundFill(dark: true, height: 260),
+              const Stack(
+                children: [
+                  SplitBackgroundFill(dark: true, height: 260),
+                  Positioned.fill(child: _ScanLineOverlay()),
+                ],
+              ),
               const SizedBox(height: 16),
               const Row(
                 children: [
@@ -379,6 +395,22 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              LinearProgressIndicator(
+                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryFixed),
+                backgroundColor: Colors.white.withValues(alpha: 0.08),
+                minHeight: 2,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Neural processing in progress',
+                style: AppTheme.label(
+                  10,
+                  color: Colors.white.withValues(alpha: 0.55),
+                  weight: FontWeight.w600,
+                  letterSpacing: 1.2,
                 ),
               ),
             ],
@@ -421,14 +453,33 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        FilledButton.icon(
-          onPressed: _stopMonitoring,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppTheme.error,
-            foregroundColor: Colors.white,
-          ),
-          icon: const Icon(Icons.stop_circle_outlined),
-          label: const Text('Stop Monitoring'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _isMuted = !_isMuted),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _isMuted ? AppTheme.error : Colors.white,
+                side: BorderSide(
+                  color: _isMuted
+                      ? AppTheme.error
+                      : Colors.white.withValues(alpha: 0.3),
+                ),
+              ),
+              icon: Icon(_isMuted ? Icons.mic_off : Icons.mic_none),
+              label: Text(_isMuted ? 'Unmute' : 'Mute'),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: _stopMonitoring,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.error,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.stop_circle_outlined),
+              label: const Text('Stop Monitoring'),
+            ),
+          ],
         ),
       ],
     );
@@ -572,6 +623,64 @@ class _AlertEntry {
 
   String get reason => videoAlert?.reason ?? audioAlert?.reason ?? '';
   String get severity => videoAlert?.severity ?? audioAlert?.severity ?? '';
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({required this.label, required this.value, this.highlight = false});
+  final String label;
+  final String value;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: highlight
+            ? AppTheme.primaryFixed.withValues(alpha: 0.18)
+            : Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: AppTheme.label(
+          10,
+          color: Colors.white.withValues(alpha: 0.88),
+          weight: FontWeight.w700,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanLineOverlay extends StatelessWidget {
+  const _ScanLineOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: CustomPaint(painter: _ScanLinePainter()),
+    );
+  }
+}
+
+class _ScanLinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.03)
+      ..strokeWidth = 1;
+    const spacing = 6.0;
+    for (double y = 0; y < size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
 class _DarkChip extends StatelessWidget {

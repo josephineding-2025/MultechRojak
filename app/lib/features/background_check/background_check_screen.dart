@@ -31,6 +31,7 @@ class _BackgroundCheckScreenState
   final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
   String _selectedPlatform = 'X';
+  String _selectedChipLabel = 'X'; // tracks which chip is visually active
   bool _showManualFields = false;
 
   BackgroundCheckRequestDto? _params;
@@ -38,14 +39,15 @@ class _BackgroundCheckScreenState
   final List<BackgroundCheckEvent> _streamEvents = [];
   String? _lastEligibilitySessionId;
 
-  static const _platforms = [
-    'X',
-    'GitHub',
-    'Instagram',
-    'Telegram',
-    'WhatsApp',
-    'Dating App',
-    'Other',
+  // Chip display label → platform value mapping
+  static const _platformChips = [
+    ('Tinder', 'Dating App'),
+    ('WhatsApp', 'WhatsApp'),
+    ('Instagram', 'Instagram'),
+    ('Bumble', 'Dating App'),
+    ('Telegram', 'Telegram'),
+    ('X', 'X'),
+    ('Other', 'Other'),
   ];
 
   @override
@@ -282,21 +284,40 @@ class _BackgroundCheckScreenState
                     },
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedPlatform,
-                    decoration: const InputDecoration(
-                      labelText: 'Platform',
-                      prefixIcon: Icon(Icons.devices_outlined),
-                    ),
-                    items: _platforms
-                        .map(
-                          (p) => DropdownMenuItem(
-                            value: p,
-                            child: Text(p),
+                  Text(
+                    'PLATFORM',
+                    style: AppTheme.label(10, weight: FontWeight.w800, letterSpacing: 1.8),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _platformChips.map((chip) {
+                      final chipLabel = chip.$1;
+                      final chipValue = chip.$2;
+                      final selected = _selectedChipLabel == chipLabel;
+                      return FilterChip(
+                        label: Text(
+                          chipLabel,
+                          style: AppTheme.label(
+                            11,
+                            color: selected ? Colors.white : AppTheme.onSurface,
+                            weight: FontWeight.w700,
+                            letterSpacing: 0.4,
                           ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedPlatform = v!),
+                        ),
+                        selected: selected,
+                        onSelected: (_) => setState(() {
+                          _selectedChipLabel = chipLabel;
+                          _selectedPlatform = chipValue;
+                        }),
+                        selectedColor: AppTheme.primaryContainer,
+                        backgroundColor: AppTheme.surfaceContainer,
+                        checkmarkColor: Colors.white,
+                        side: BorderSide.none,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      );
+                    }).toList(),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -568,6 +589,14 @@ class _BackgroundCheckScreenState
     );
   }
 
+  String _buildCaseId(String username) {
+    final hash = username.hashCode.abs();
+    final num = hash % 9000 + 1000;
+    final a = String.fromCharCode(65 + hash % 26);
+    final b = String.fromCharCode(65 + (hash >> 4) % 26);
+    return '#$num-$a$b';
+  }
+
   Widget _buildResult(BackgroundCheckResult data) {
     final phones = data.discoveredIdentifiers?.phones ?? const <String>[];
     _persistCommunityEligibility(data);
@@ -637,6 +666,15 @@ class _BackgroundCheckScreenState
                             style: AppTheme.label(10, weight: FontWeight.w700),
                           ),
                         ],
+                        const SizedBox(height: 6),
+                        Text(
+                          _buildCaseId(handle),
+                          style: AppTheme.label(
+                            10,
+                            color: AppTheme.onSurfaceVariant,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -660,6 +698,28 @@ class _BackgroundCheckScreenState
             ],
           ),
         ),
+        if (riskLevel == 'HIGH' || riskLevel == 'CRITICAL') ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppTheme.errorContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 18, color: AppTheme.error),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    'Discrepancy detected between claimed identity and digital footprint.',
+                    style: AppTheme.body(13, color: AppTheme.error, height: 1.45),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         _ResultBlock(
           title: 'Photo Verification',

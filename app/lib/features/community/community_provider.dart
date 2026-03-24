@@ -20,3 +20,9 @@ final flagScammerProvider =
     return service.flagScammer(request);
   },
 );
+
+final communityFeedProvider =
+    FutureProvider<List<CommunityFeedEntry>>((ref) async {
+  final service = CommunityService();
+  return service.getFeed();
+});

@@ -30,6 +30,8 @@ class ProfileCheckResult {
   final String? firstReported;
   final List<String>? commonFlags;
   final String? region;
+  final String? photoHash;
+  final String? handle;
 
   const ProfileCheckResult({
     required this.flagged,
@@ -38,6 +40,8 @@ class ProfileCheckResult {
     this.firstReported,
     this.commonFlags,
     this.region,
+    this.photoHash,
+    this.handle,
   });
 
   factory ProfileCheckResult.fromJson(Map<String, dynamic> json) =>
@@ -50,6 +54,8 @@ class ProfileCheckResult {
             ?.map((e) => e as String)
             .toList(),
         region: json['region'] as String?,
+        photoHash: json['photo_hash'] as String?,
+        handle: json['handle'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -59,5 +65,39 @@ class ProfileCheckResult {
         'first_reported': firstReported,
         'common_flags': commonFlags,
         'region': region,
+        'photo_hash': photoHash,
+        'handle': handle,
       };
+}
+
+class CommunityFeedEntry {
+  const CommunityFeedEntry({
+    this.handle,
+    this.platform,
+    this.region,
+    this.status,
+    this.reportCount,
+    this.lastReported,
+    this.commonFlags,
+  });
+
+  final String? handle;
+  final String? platform;
+  final String? region;
+  final String? status;
+  final int? reportCount;
+  final String? lastReported;
+  final List<String>? commonFlags;
+
+  factory CommunityFeedEntry.fromJson(Map<String, dynamic> j) =>
+      CommunityFeedEntry(
+        handle: j['handle'] as String?,
+        platform: j['platform'] as String?,
+        region: j['region'] as String?,
+        status: j['status'] as String?,
+        reportCount: j['report_count'] as int?,
+        lastReported: j['last_reported'] as String?,
+        commonFlags:
+            (j['common_flags'] as List<dynamic>?)?.cast<String>(),
+      );
 }

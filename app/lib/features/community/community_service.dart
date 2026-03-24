@@ -24,4 +24,14 @@ class CommunityService {
         await _client.dio.post('/flag-scammer', data: request.toJson());
     return FlagScammerResult.fromJson(response.data as Map<String, dynamic>);
   }
+
+  Future<List<CommunityFeedEntry>> getFeed({int limit = 10}) async {
+    final response = await _client.dio.get(
+      '/community/feed',
+      queryParameters: {'limit': limit},
+    );
+    return (response.data as List)
+        .map((e) => CommunityFeedEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 }
