@@ -14,6 +14,9 @@ class CommunityLaunchIntent {
     this.handle,
     this.phone,
     this.photoHash,
+    this.sourceType,
+    this.sourceRiskLevel,
+    this.sourceSessionId,
   });
 
   final int launchId;
@@ -22,6 +25,10 @@ class CommunityLaunchIntent {
   final String? handle;
   final String? phone;
   final String? photoHash;
+  // Eligibility carried inline so the community screen doesn't need a disk read
+  final String? sourceType;
+  final String? sourceRiskLevel;
+  final String? sourceSessionId;
 }
 
 final shellTabProvider = StateProvider<ShellTab>((ref) => ShellTab.monitor);

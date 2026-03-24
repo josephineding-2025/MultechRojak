@@ -6,28 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('video monitor shows readiness message when backend is offline', (
-    WidgetTester tester,
-  ) async {
+  Future<void> pumpVideoMonitor(
+    WidgetTester tester, {
+    required BackendReadiness readiness,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          backendReadinessProvider.overrideWith(
-            (ref) async => const BackendReadiness(
-              status: 'offline',
-              version: '0.1.0',
-              readiness: 'config_needed',
-              missingCoreEnv: ['OPENROUTER_API_KEY'],
-              missingOptionalEnv: [],
-              capabilities: {
-                'chat_analysis': false,
-                'video_frame_analysis': false,
-                'audio_analysis': false,
-                'background_check': false,
-                'community': false,
-              },
-            ),
-          ),
+          backendReadinessProvider.overrideWith((ref) async => readiness),
         ],
         child: const MaterialApp(
           home: Scaffold(
@@ -37,11 +23,63 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('video monitor shows readiness message when backend is offline', (
+    WidgetTester tester,
+  ) async {
+    await pumpVideoMonitor(
+      tester,
+      readiness: const BackendReadiness(
+        status: 'offline',
+        version: '0.1.0',
+        readiness: 'config_needed',
+        missingCoreEnv: ['OPENROUTER_API_KEY'],
+        missingOptionalEnv: [],
+        capabilities: {
+          'chat_analysis': false,
+          'video_frame_analysis': false,
+          'audio_analysis': false,
+          'background_check': false,
+          'community': false,
+        },
+      ),
+    );
 
     expect(find.text('Start Monitoring'), findsOneWidget);
     expect(
       find.text('Start the backend first to monitor video calls.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('video monitor stays readable on narrow overlay widths', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(280, 620);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pumpVideoMonitor(
+      tester,
+      readiness: const BackendReadiness(
+        status: 'ok',
+        version: '0.1.0',
+        readiness: 'config_needed',
+        missingCoreEnv: ['OPENROUTER_API_KEY'],
+        missingOptionalEnv: [],
+        capabilities: {
+          'chat_analysis': false,
+          'video_frame_analysis': false,
+          'audio_analysis': false,
+          'background_check': false,
+          'community': false,
+        },
+      ),
+    );
+
+    expect(find.text('Start Monitoring'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

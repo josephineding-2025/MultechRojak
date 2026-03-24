@@ -169,6 +169,19 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       _flagPhoneController.text = intent.phone!;
     }
 
+    // Apply eligibility inline from the intent so we don't depend on a disk read
+    if (intent.sourceRiskLevel != null && intent.sourceSessionId != null) {
+      _eligibility = CommunityFlagEligibility(
+        sourceType: intent.sourceType ?? 'unknown',
+        sourceRiskLevel: intent.sourceRiskLevel!,
+        sourceSessionId: intent.sourceSessionId!,
+        platform: intent.platform,
+        handle: intent.handle,
+        phone: intent.phone,
+        photoHash: intent.photoHash,
+      );
+    }
+
     ref.read(communityLaunchIntentProvider.notifier).state = null;
     _applyPendingLaunchIntentSelection();
   }

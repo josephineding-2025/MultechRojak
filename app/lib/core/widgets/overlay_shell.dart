@@ -64,7 +64,7 @@ class OverlayShell extends ConsumerWidget {
               onRetry: () => ref.invalidate(backendReadinessProvider),
             ),
             Expanded(
-              child: IndexedStack(
+              child: _LazyIndexedStack(
                 index: selectedIndex,
                 children: _screens,
               ),
@@ -76,6 +76,46 @@ class OverlayShell extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LazyIndexedStack extends StatefulWidget {
+  const _LazyIndexedStack({
+    required this.index,
+    required this.children,
+  });
+
+  final int index;
+  final List<Widget> children;
+
+  @override
+  State<_LazyIndexedStack> createState() => _LazyIndexedStackState();
+}
+
+class _LazyIndexedStackState extends State<_LazyIndexedStack> {
+  late final Set<int> _loadedIndexes = {widget.index};
+
+  @override
+  void didUpdateWidget(covariant _LazyIndexedStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _loadedIndexes.add(widget.index);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final index in _loadedIndexes)
+          Offstage(
+            offstage: widget.index != index,
+            child: TickerMode(
+              enabled: widget.index == index,
+              child: widget.children[index],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -122,74 +162,110 @@ class _AppHeader extends StatelessWidget {
         ),
     };
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: AppTheme.gradientBox(radius: 999),
-            child: const Icon(Icons.security, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'What is Fake Love',
-                  style: AppTheme.headline(
-                    18,
-                    color: AppTheme.primary,
-                    weight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'AI safety overlay for modern social trust signals',
-                  style: AppTheme.body(
-                    11,
-                    color: AppTheme.onSurfaceVariant,
-                    height: 1.25,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Tooltip(
-            message: status.detail,
-            child: InkWell(
-              onTap: onRetry,
-              borderRadius: BorderRadius.circular(999),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: status.background,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(status.icon, size: 14, color: status.color),
-                    const SizedBox(width: 6),
-                    Text(
-                      status.label,
-                      style: AppTheme.label(
-                        10,
-                        color: status.color,
-                        weight: FontWeight.w800,
-                        letterSpacing: 1.8,
-                      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 340;
+        final statusPill = Tooltip(
+          message: status.detail,
+          child: InkWell(
+            onTap: onRetry,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: status.background,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(status.icon, size: 14, color: status.color),
+                  const SizedBox(width: 6),
+                  Text(
+                    status.label,
+                    style: AppTheme.label(
+                      10,
+                      color: status.color,
+                      weight: FontWeight.w800,
+                      letterSpacing: 1.8,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+
+        final titleBlock = Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'What is Fake Love',
+                style: AppTheme.headline(
+                  18,
+                  color: AppTheme.primary,
+                  weight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'AI safety overlay for modern social trust signals',
+                style: AppTheme.body(
+                  11,
+                  color: AppTheme.onSurfaceVariant,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        );
+
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, compact ? 14 : 18, 20, 18),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: AppTheme.gradientBox(radius: 999),
+                          child: const Icon(
+                            Icons.security,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        titleBlock,
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    statusPill,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: AppTheme.gradientBox(radius: 999),
+                      child: const Icon(
+                        Icons.security,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    titleBlock,
+                    statusPill,
+                  ],
+                ),
+        );
+      },
     );
   }
 }

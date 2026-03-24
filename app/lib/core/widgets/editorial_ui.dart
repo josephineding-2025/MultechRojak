@@ -106,23 +106,27 @@ class EditorialEyebrow extends StatelessWidget {
         color: background,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: foreground),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            label,
-            style: AppTheme.label(
-              10,
-              color: foreground,
-              weight: FontWeight.w700,
-              letterSpacing: 2,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: foreground),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: AppTheme.label(
+                10,
+                color: foreground,
+                weight: FontWeight.w700,
+                letterSpacing: 2,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

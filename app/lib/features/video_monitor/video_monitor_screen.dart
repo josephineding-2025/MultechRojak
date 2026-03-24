@@ -203,14 +203,17 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(backendReadinessProvider);
+    final layout = _VideoMonitorLayout.fromWidth(MediaQuery.sizeOf(context).width);
+
     return Stack(
       children: [
         EditorialPage(
           dark: true,
+          padding: layout.pagePadding,
           child: switch (_state) {
-            _MonitorState.idle => _buildIdle(),
-            _MonitorState.active => _buildActive(),
-            _MonitorState.summary => _buildSummary(),
+            _MonitorState.idle => _buildIdle(layout),
+            _MonitorState.active => _buildActive(layout),
+            _MonitorState.summary => _buildSummary(layout),
           },
         ),
         if (_stickyAlert != null && _state == _MonitorState.active)
@@ -228,7 +231,7 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
     );
   }
 
-  Widget _buildIdle() {
+  Widget _buildIdle(_VideoMonitorLayout layout) {
     final canUseVideoMonitoring = _canUseVideoMonitoring();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,7 +245,7 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
         Text(
           'Visuals',
           style: AppTheme.headline(
-            46,
+            layout.heroTitleSize,
             color: Colors.white,
             weight: FontWeight.w800,
           ),
@@ -260,11 +263,14 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
         GlassPanel(
           dark: true,
           radius: 32,
+          padding: layout.panelPadding,
           child: Column(
             children: [
-              const SplitBackgroundFill(dark: true, height: 220),
+              SplitBackgroundFill(dark: true, height: layout.previewHeight),
               const SizedBox(height: 18),
-              const Row(
+              const Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: [
                   _DarkChip(
                     icon: Icons.radar,
@@ -317,18 +323,19 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
     );
   }
 
-  Widget _buildActive() {
+  Widget _buildActive(_VideoMonitorLayout layout) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
           children: [
             const _DarkChip(
               icon: Icons.radar,
               label: 'Active Monitoring',
               pulse: true,
             ),
-            const Spacer(),
             _DarkChip(
               icon: Icons.schedule,
               label: _formatTime(_seconds),
@@ -336,70 +343,70 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
           ],
         ),
         const SizedBox(height: 10),
-        const Row(
+        const Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             _StatChip(label: 'Latency', value: '--ms'),
-            SizedBox(width: 8),
             _StatChip(label: 'Res', value: '1080p'),
-            SizedBox(width: 8),
             _StatChip(label: 'Shield', value: 'ON', highlight: true),
           ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
+        // Status panel
         Container(
           width: double.infinity,
-          decoration: AppTheme.darkGlass(radius: 32),
-          padding: const EdgeInsets.all(22),
+          decoration: AppTheme.darkGlass(radius: 28),
+          padding: layout.compactPanelPadding,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Stack(
-                children: [
-                  SplitBackgroundFill(dark: true, height: 260),
-                  Positioned.fill(child: _ScanLineOverlay()),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Row(
-                children: [
-                  Expanded(
-                    child: _DarkChip(
-                      icon: Icons.lock,
-                      label: 'Sentinel Shield Active',
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  MockTag(label: 'Network mock'),
-                ],
-              ),
-              const SizedBox(height: 14),
-              TonalPanel(
-                color: Colors.white.withValues(alpha: 0.06),
-                radius: 22,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              if (layout.isCompact) ...[
+                const _DarkChip(
+                  icon: Icons.lock,
+                  label: 'Sentinel Shield Active',
+                ),
+                const SizedBox(height: 10),
+                const MockTag(label: 'Network mock'),
+              ] else
+                const Row(
                   children: [
-                    const Icon(
-                      Icons.insights_outlined,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        _statusMessage,
-                        style: AppTheme.body(
-                          12,
-                          color: Colors.white.withValues(alpha: 0.74),
-                          height: 1.5,
-                        ),
+                      child: _DarkChip(
+                        icon: Icons.lock,
+                        label: 'Sentinel Shield Active',
                       ),
                     ),
+                    SizedBox(width: 10),
+                    MockTag(label: 'Network mock'),
                   ],
                 ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.insights_outlined,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _statusMessage,
+                      style: AppTheme.body(
+                        12,
+                        color: Colors.white.withValues(alpha: 0.74),
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               LinearProgressIndicator(
-                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryFixed),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppTheme.primaryFixed),
                 backgroundColor: Colors.white.withValues(alpha: 0.08),
                 minHeight: 2,
               ),
@@ -416,7 +423,8 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
+        // Alert area
         if (_alerts.isEmpty)
           const _DarkNoAlertCard()
         else ...[
@@ -436,25 +444,18 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
             ),
           ),
         ],
-        const SizedBox(height: 12),
-        SurfacePanel(
-          dark: true,
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            children: [
-              const Expanded(
-                child: _MockAudioAlertCard(),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _MockNetworkPanel(seconds: _seconds),
-              ),
-            ],
-          ),
-        ),
+        const SizedBox(height: 14),
+        // Mock audio panel
+        const _MockAudioAlertCard(),
+        const SizedBox(height: 10),
+        // Mock network panel
+        _MockNetworkPanel(seconds: _seconds),
         const SizedBox(height: 18),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        // Controls
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 12,
+          runSpacing: 12,
           children: [
             OutlinedButton.icon(
               onPressed: () => setState(() => _isMuted = !_isMuted),
@@ -469,7 +470,6 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
               icon: Icon(_isMuted ? Icons.mic_off : Icons.mic_none),
               label: Text(_isMuted ? 'Unmute' : 'Mute'),
             ),
-            const SizedBox(width: 12),
             FilledButton.icon(
               onPressed: _stopMonitoring,
               style: FilledButton.styleFrom(
@@ -485,7 +485,7 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
     );
   }
 
-  Widget _buildSummary() {
+  Widget _buildSummary(_VideoMonitorLayout layout) {
     final highestSeverity = _alerts.isEmpty
         ? 'LOW'
         : _alerts.map((entry) => entry.severity).reduce(_maxSeverity);
@@ -505,7 +505,7 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
         Text(
           'Call Summary',
           style: AppTheme.headline(
-            36,
+            layout.summaryTitleSize,
             color: Colors.white,
             weight: FontWeight.w800,
           ),
@@ -513,27 +513,29 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
         const SizedBox(height: 18),
         GlassPanel(
           dark: true,
-          child: Row(
-            children: [
-              MetricRing(
-                score: (_alerts.length * 20).clamp(0, 100),
-                label: 'ALERT LOAD',
-                color: summaryColor,
-                size: 104,
-                dark: true,
-                trackColor: Colors.white.withValues(alpha: 0.1),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
+          padding: layout.panelPadding,
+          child: layout.isCompact
+              ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Align(
+                      alignment: Alignment.center,
+                      child: MetricRing(
+                        score: (_alerts.length * 20).clamp(0, 100),
+                        label: 'ALERT LOAD',
+                        color: summaryColor,
+                        size: 104,
+                        dark: true,
+                        trackColor: Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
                     Text(
                       _alerts.isEmpty
                           ? 'No visual alerts were triggered.'
                           : '${_alerts.length} visual alert${_alerts.length == 1 ? '' : 's'} were triggered.',
                       style: AppTheme.headline(
-                        20,
+                        18,
                         color: Colors.white,
                         weight: FontWeight.w800,
                       ),
@@ -548,10 +550,46 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
                       ),
                     ),
                   ],
+                )
+              : Row(
+                  children: [
+                    MetricRing(
+                      score: (_alerts.length * 20).clamp(0, 100),
+                      label: 'ALERT LOAD',
+                      color: summaryColor,
+                      size: 104,
+                      dark: true,
+                      trackColor: Colors.white.withValues(alpha: 0.1),
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _alerts.isEmpty
+                                ? 'No visual alerts were triggered.'
+                                : '${_alerts.length} visual alert${_alerts.length == 1 ? '' : 's'} were triggered.',
+                            style: AppTheme.headline(
+                              20,
+                              color: Colors.white,
+                              weight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _statusMessage,
+                            style: AppTheme.body(
+                              12,
+                              color: Colors.white.withValues(alpha: 0.72),
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 12),
@@ -610,6 +648,33 @@ class _VideoMonitorScreenState extends ConsumerState<VideoMonitorScreen> {
   }
 }
 
+class _VideoMonitorLayout {
+  const _VideoMonitorLayout._(this.width);
+
+  factory _VideoMonitorLayout.fromWidth(double width) {
+    return _VideoMonitorLayout._(width);
+  }
+
+  final double width;
+
+  bool get isCompact => width < 320;
+  bool get isNarrow => width < 420;
+
+  double get heroTitleSize => isCompact ? 32 : (isNarrow ? 40 : 46);
+  double get summaryTitleSize => isCompact ? 30 : 36;
+  double get previewHeight => isCompact ? 160 : (isNarrow ? 190 : 220);
+
+  EdgeInsets get pagePadding => EdgeInsets.fromLTRB(
+        isCompact ? 16 : 20,
+        isCompact ? 22 : 28,
+        isCompact ? 16 : 20,
+        isCompact ? 20 : 28,
+      );
+
+  EdgeInsets get panelPadding => EdgeInsets.all(isCompact ? 18 : 24);
+  EdgeInsets get compactPanelPadding => EdgeInsets.all(isCompact ? 16 : 18);
+}
+
 class _AlertEntry {
   _AlertEntry.video(this.videoAlert)
       : type = 'video',
@@ -655,33 +720,6 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-class _ScanLineOverlay extends StatelessWidget {
-  const _ScanLineOverlay();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: CustomPaint(painter: _ScanLinePainter()),
-    );
-  }
-}
-
-class _ScanLinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.03)
-      ..strokeWidth = 1;
-    const spacing = 6.0;
-    for (double y = 0; y < size.height; y += spacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
-}
 
 class _DarkChip extends StatelessWidget {
   const _DarkChip({
@@ -773,20 +811,43 @@ class _DarkFeatureCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: AppTheme.headline(
-                          16,
-                          color: Colors.white,
-                          weight: FontWeight.w800,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = trailing != null && constraints.maxWidth < 220;
+                    if (compact) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: AppTheme.headline(
+                              16,
+                              color: Colors.white,
+                              weight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          trailing!,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: AppTheme.headline(
+                              16,
+                              color: Colors.white,
+                              weight: FontWeight.w800,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    if (trailing != null) trailing!,
-                  ],
+                        if (trailing != null) trailing!,
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -882,16 +943,17 @@ class _AlertCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Expanded(
-                      child: Text(
-                        'Visual Alert',
-                        style: AppTheme.headline(
-                          16,
-                          color: Colors.white,
-                          weight: FontWeight.w800,
-                        ),
+                    Text(
+                      'Visual Alert',
+                      style: AppTheme.headline(
+                        16,
+                        color: Colors.white,
+                        weight: FontWeight.w800,
                       ),
                     ),
                     RiskBadge(
@@ -1055,14 +1117,15 @@ class _StickyAlertCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            OverflowBar(
+              alignment: MainAxisAlignment.end,
+              spacing: 8,
+              overflowSpacing: 8,
               children: [
                 TextButton(
                   onPressed: onDismiss,
                   child: const Text('Dismiss'),
                 ),
-                const SizedBox(width: 8),
                 FilledButton(
                   onPressed: onSeeDetails,
                   style: FilledButton.styleFrom(

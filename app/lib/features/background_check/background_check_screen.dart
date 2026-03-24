@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,6 +41,8 @@ class _BackgroundCheckScreenState
   BackgroundCheckStreamRequestDto? _streamParams;
   final List<BackgroundCheckEvent> _streamEvents = [];
   String? _lastEligibilitySessionId;
+  String? _selectedPhotoB64;
+  String? _selectedPhotoName;
 
   // Chip display label → platform value mapping
   static const _platformChips = [
@@ -87,9 +92,32 @@ class _BackgroundCheckScreenState
           username: username,
           platform: _selectedPlatform,
           phone: phone.isNotEmpty ? phone : null,
+          photoB64: _selectedPhotoB64,
         );
       });
     }
+  }
+
+  Future<void> _pickPhoto() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null) return;
+    setState(() {
+      _selectedPhotoB64 = base64Encode(file.bytes!);
+      _selectedPhotoName = file.name;
+    });
+  }
+
+  void _clearPhoto() {
+    setState(() {
+      _selectedPhotoB64 = null;
+      _selectedPhotoName = null;
+    });
   }
 
   void _reset() {
@@ -331,22 +359,65 @@ class _BackgroundCheckScreenState
                   ),
                 ],
                 const SizedBox(height: 16),
-                TonalPanel(
-                  child: Row(
-                    children: [
-                      const MockTag(label: 'Upload UI'),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Profile photo upload is styled now and will stay disabled until the current `photoB64` request path is wired into the form.',
-                          style: AppTheme.body(
-                            12,
-                            color: AppTheme.onSurfaceVariant,
-                            height: 1.45,
+                GestureDetector(
+                  onTap: _pickPhoto,
+                  child: TonalPanel(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryFixed.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            _selectedPhotoB64 != null
+                                ? Icons.check_circle_outline
+                                : Icons.add_photo_alternate_outlined,
+                            size: 20,
+                            color: _selectedPhotoB64 != null
+                                ? AppTheme.success
+                                : AppTheme.primary,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _selectedPhotoName != null
+                                    ? _selectedPhotoName!
+                                    : 'Upload profile photo',
+                                style: AppTheme.headline(
+                                  13,
+                                  weight: FontWeight.w700,
+                                  color: _selectedPhotoB64 != null
+                                      ? AppTheme.onSurface
+                                      : AppTheme.primary,
+                                ),
+                              ),
+                              Text(
+                                _selectedPhotoB64 != null
+                                    ? 'Tap to change · pHash will be computed on scan'
+                                    : 'Optional — enables reverse image search',
+                                style: AppTheme.body(
+                                  11,
+                                  color: AppTheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_selectedPhotoB64 != null)
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            color: AppTheme.onSurfaceVariant,
+                            onPressed: _clearPhoto,
+                          ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -869,6 +940,10 @@ class _BackgroundCheckScreenState
   Future<void> _openCommunityFlagFlow(BackgroundCheckResult data) async {
     final handles = data.discoveredIdentifiers?.handles ?? const <String>[];
     final phones = data.discoveredIdentifiers?.phones ?? const <String>[];
+    final riskLevel = data.riskLevel ??
+        _riskLevelFromConsistencyScore(data.profileConsistencyScore);
+    final sessionId =
+        _streamParams?.profileUrl ?? _params?.username ?? 'background-check';
     ref.read(communityLaunchIntentProvider.notifier).state = CommunityLaunchIntent(
       launchId: DateTime.now().microsecondsSinceEpoch,
       mode: CommunityLaunchMode.flag,
@@ -877,6 +952,9 @@ class _BackgroundCheckScreenState
           (handles.isNotEmpty ? handles.first : null),
       phone: _params?.phone ?? (phones.isNotEmpty ? phones.first : null),
       photoHash: data.photoHash,
+      sourceType: 'background_check',
+      sourceRiskLevel: riskLevel,
+      sourceSessionId: sessionId,
     );
     ref.read(shellTabProvider.notifier).state = ShellTab.circle;
   }
